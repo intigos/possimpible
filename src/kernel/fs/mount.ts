@@ -24,8 +24,8 @@ export class MountManager{
             read:(file, count) => {
                 return new Promise<string>((resolve, reject) => {
                     resolve(this.mounts.map(x => {
-                        return `${x.mount.superblock.fileSystemType.name} ${kernel.vfs.dcache.path({entry:x.mount.root, mount:x.mount})}`
-                    }).reduce((x,y) => x + "\n" + y));
+                        return `${x.mount.superblock.fileSystemType.name} ${kernel.vfs.path({entry:x.mount.root, mount:x.mount})}`
+                    }).reduce((x,y) => x + "\n" + y) + "\n");
                 });
             },
             write:(file, string) => {}

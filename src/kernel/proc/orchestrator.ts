@@ -1,4 +1,4 @@
-import {IProcMessage, MessageType} from "../../shared/proc";
+import {IDependency, IProcMessage, MessageType} from "../../shared/proc";
 import {v4 as UUID } from 'uuid';
 import {Kernel} from "../kernel";
 
@@ -15,9 +15,16 @@ interface IOrchestrator{
     getcontainer: () => Promise<IContainer>;
 }
 
+export interface IRunParams{
+    code: string;
+    argv: string[];
+    dyna: IDependency[];
+    listener: (message:IProcMessage, container: IContainer) => void;
+}
+
 export interface IContainerOperations {
     send: (container: IContainer, message:IProcMessage) => void,
-    run: (container: IContainer, argv: string[], code: string, listener: (message:IProcMessage, container: IContainer) => void) => void
+    run: (container: IContainer, params: IRunParams) => void
     kill: (container: IContainer) => void
 }
 
@@ -36,7 +43,6 @@ export class OrchestratorManagement {
     }
 
     registerOrchestrator(orchestrator: IOrchestrator){
-        this.kernel.printk("Registering Orchestrator " + orchestrator.name);
         this.orchestrator.set(orchestrator.name, orchestrator);
     }
 

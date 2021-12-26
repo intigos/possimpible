@@ -1,5 +1,6 @@
 import {
-    IProcClose, IProcExec, IProcExecRes, IProcGetCwd, IProcGetCwdRes, IProcGetDEnts, IProcGetDEntsRes,
+    IProcChCwd,
+    IProcClose, IProcDie, IProcExec, IProcExecRes, IProcGetCwd, IProcGetCwdRes, IProcGetDEnts, IProcGetDEntsRes,
     IProcMessage, IProcOpen, IProcOpenRes,
     IProcRead,
     IProcReadRes,
@@ -20,7 +21,9 @@ export class Process{
         getcwd: this.sys_getcwd.bind(this),
         getdents: this.sys_getdents.bind(this),
         close: this.sys_close.bind(this),
-        exec: this.sys_exec.bind(this)
+        exec: this.sys_exec.bind(this),
+        chcwd: this.sys_chcwd.bind(this),
+        die: this.sys_die.bind(this)
     }
 
     private uuidv4() {
@@ -45,6 +48,10 @@ export class Process{
         }else if(message.type == MessageType.START){
             let startMsg = message as IProcStart;
             this.argv = startMsg.argv;
+            for (const dep of startMsg.dyna) {
+                (self as any)[dep.name] = null;
+                eval(dep.code);
+            }
             eval(startMsg.code);
         }
     }
@@ -139,5 +146,26 @@ export class Process{
         const res = await this.callWithPromise(param) as IProcExecRes;
 
         return res.pid;
+    }
+
+    private async sys_chcwd(path: string){
+        const param: IProcChCwd = {
+            type: MessageType.CHCWD,
+            id: this.uuidv4(),
+            path: path
+        };
+        const res = await this.callWithPromise(param) as IProcExecRes;
+        return
+    }
+
+    private async sys_die(){
+        const param: IProcDie = {
+            type: MessageType.DIE,
+            id: this.uuidv4(),
+        };
+
+        // wait to block
+        const res = await this.callWithPromise(param) as IProcExecRes;
+        return
     }
 }

@@ -16,7 +16,8 @@
         "paths": {
             "@/*": [
                 "src/*"
-            ]
+            ],
+            "libts": ["../libts/"]
         },
         "lib": [
             "esnext",
@@ -27,8 +28,8 @@
         ]
     },
     "include": [
-        "src/public/**/*.ts",
-        "src/toolchain/**/*.ts"
+        "../../public/**/*.ts",
+        "src/**/*.ts",
     ],
     "exclude": [
         "node_modules"

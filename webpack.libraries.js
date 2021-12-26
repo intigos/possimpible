@@ -8,6 +8,8 @@ const CssMinimizerPlugin = require('css-minimizer-webpack-plugin');
 const TerserPlugin = require('terser-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const RemoveEmptyScriptsPlugin = require('webpack-remove-empty-scripts');
+var DeclarationBundlerPlugin = require('types-webpack-bundler');
+
 
 // load toolchain files
 const fs = require('fs');
@@ -15,7 +17,7 @@ let rawdata = fs.readFileSync('config/toolchain.json');
 let toolchainConfig = JSON.parse(rawdata);
 
 const entrypoints = {}
-toolchainConfig.execs.forEach(x => {
+toolchainConfig.libs.forEach(x => {
     entrypoints[x] = [path.resolve(__dirname, `./src/toolchain/${x}/src/main.ts`)]
 })
 
@@ -26,8 +28,10 @@ module.exports = (env = {}) => ({
     output: {
         path: path.resolve(__dirname, './dist/toolchain/'),
         filename: 'js/[name].js',
-        publicPath: '/',
-        chunkFilename: 'js/[name].js'
+        library: {
+            name: "[name]",
+            type: "assign"
+        }
     },
     stats: 'summary',
     plugins: [
@@ -90,6 +94,8 @@ module.exports = (env = {}) => ({
         alias: {
             '@': '/Users/nurv/git/intigos/possimpible/src',
             '&': '/Users/nurv/git/intigos/possimpible/dist',
-        },
+        }
     },
+    plugins: [
+    ]
 });

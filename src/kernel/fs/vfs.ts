@@ -110,7 +110,6 @@ export class VirtualFileSystem{
     }
 
     registerFS(fst: IFileSystemType){
-        this.kernel.printk("Registering FST " + fst.name);
         this.filesystems[fst.name] = fst;
     }
     getFS(name: string): IFileSystemType{
@@ -123,11 +122,47 @@ export class VirtualFileSystem{
         return file;
     }
 
-    lookup(cwd: IDEntry|null, mount: IVFSMount|null, path: string): IPath{
+    path(path: IPath): string{
+        let buf = "";
+        let p: IPath|undefined = path;
+        while(p){
+            let entry:any = p.entry;
+            let mount = p.mount;
+            while(entry.parent != null){
+                buf = "/" + entry.name + buf;
+                entry = entry.parent;
+            }
+            p = this.kernel.vfs.mounts.lookupMountpoint(mount!);
+        }
+        return buf.length ? buf : "/";
+    }
+
+    findRoot(path: IPath): IPath{
+        let p: IPath|undefined = path;
+        let entry = p.entry;
+        let mount = p.mount;
+        while(p){
+            entry = p.entry;
+            mount = p.mount;
+            while(entry.parent != null){
+                entry = entry.parent;
+            }
+            p = this.kernel.vfs.mounts.lookupMountpoint(mount!);
+        }
+        return {mount:mount, entry:entry};
+    }
+
+    lookup(cwd: IPath|null, path: string): IPath{
         const seg = splitInSegments(path);
-        let component = seg.shift()!;
-        if (mount){
-            let pivot: IPath = {entry:mount.root, mount};
+        if (cwd){
+            let pivot: IPath;
+            let component: string;
+            if(path.startsWith("/")){
+                component = seg.shift()!;
+                pivot = this.findRoot(cwd);
+            }else{
+                pivot = {entry:cwd.entry, mount:cwd.mount};
+            }
             while(seg.length){
                 component = seg.shift()!;
                 let child = this.dcache.lookup(pivot.entry, component);
@@ -141,7 +176,7 @@ export class VirtualFileSystem{
                 }
 
                 if(child.mounted){
-                    pivot.mount = this.mounts.lookupChild(mount, child)!;
+                    pivot.mount = this.mounts.lookupChild(pivot.mount!, child)!;
                     pivot.entry = pivot.mount.root;
                 }else{
                     pivot.entry = child;
@@ -149,7 +184,7 @@ export class VirtualFileSystem{
             }
             return pivot;
         }else{
-            let entry = this.dcache.alloc(null, component);
+            let entry = this.dcache.alloc(null, '');
             return { mount: null, entry: entry }
         }
 

@@ -20,4 +20,6 @@ export interface ISystemCalls{
     getcwd: () => Promise<string>,
     close: (fd: FileDescriptor) => void,
     exec: (path: string, argv: string[]) => Promise<number>
+    chcwd: (path: string) => void;
+    die: () => Promise<void>
 }

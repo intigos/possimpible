@@ -12,6 +12,8 @@ export enum MessageType{
     GETDENTS,
     GETCWD,
     EXEC,
+    CHCWD,
+    DIE,
 
     READ_RES,
     WRITE_RES,
@@ -19,6 +21,7 @@ export enum MessageType{
     GETDENTS_RES,
     GETCWD_RES,
     EXEC_RES,
+    CHCWD_RES,
 }
 
 export interface IProcMessage{
@@ -26,10 +29,16 @@ export interface IProcMessage{
     id: MessageID
 }
 
+export interface IDependency{
+    name:string,
+    code:string
+}
+
 export interface IProcStart extends IProcMessage{
     type: MessageType.START,
     code: string,
-    argv: string[]
+    argv: string[],
+    dyna: IDependency[],
 }
 
 export interface IProcRead extends IProcMessage{
@@ -100,4 +109,17 @@ export interface IProcExec extends IProcMessage{
 export interface IProcExecRes extends IProcMessage{
     type: MessageType.EXEC_RES,
     pid:number
+}
+
+export interface IProcChCwd extends IProcMessage{
+    type: MessageType.CHCWD,
+    path: string
+}
+
+export interface IProcChCwdRes extends IProcMessage{
+    type: MessageType.CHCWD_RES
+}
+
+export interface IProcDie extends IProcMessage{
+    type: MessageType.DIE
 }

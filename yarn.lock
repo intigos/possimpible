@@ -4419,6 +4419,11 @@ typedarray@^0.0.6:
   resolved "https://registry.yarnpkg.com/typedarray/-/typedarray-0.0.6.tgz#867ac74e3864187b1d3d47d996a78ec5c8830777"
   integrity sha1-hnrHTjhkGHsdPUfZlqeOxciDB3c=
 
+types-webpack-bundler@^1.0.2:
+  version "1.0.2"
+  resolved "https://registry.yarnpkg.com/types-webpack-bundler/-/types-webpack-bundler-1.0.2.tgz#494ef8221ac0ba18092e9c4ec6321d56811cc9e2"
+  integrity sha512-McBxKu99h2WTyOl76SMcS5T3vKTsxBQxe5BQwrbcrFwnczQkU7ae6RKmUN/mqIYOIo4LnIowxFJY0XjPKurP/A==
+
 typescript@^4.5.4:
   version "4.5.4"
   resolved "https://registry.npmjs.org/typescript/-/typescript-4.5.4.tgz"

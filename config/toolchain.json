@@ -1,4 +1,7 @@
 {
+  "libs": [
+    "libts"
+  ],
   "execs": [
     "cat",
     "psh"

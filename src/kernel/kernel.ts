@@ -46,18 +46,19 @@ export class Kernel{
             return
         }
         this.printk(`mounting initrd (size:${this.options.initrd.length}) into /`)
-        const root = this.vfs.lookup(null, null, "/")!;
+        const root = this.vfs.lookup(null, "/")!;
         root.mount = await this.vfs.mount(this.options.initrd, root.mount, root.entry, this.vfs.getFS("blobfs"))
+        root.entry = root.mount.superblock.root;
 
-        const dev = this.vfs.lookup(root.entry,root.mount,"/dev")!;
+        const dev = this.vfs.lookup(root,"/dev")!;
         await this.vfs.mount("", dev.mount, dev.entry, this.vfs.getFS("devfs"));
 
-        const proc = this.vfs.lookup(root.entry,root.mount,"/proc")!;
+        const proc = this.vfs.lookup(root, "/proc")!;
         await this.vfs.mount("", proc.mount, proc.entry, this.vfs.getFS("procfs"));
 
 
         this.printk(`exec ${this.options.initrc} into PID 1`)
-        await this.processes.createInitProcess(this.options.initrc, root);
+        await this.processes.createProcess(this.options.initrc, [], root, undefined);
         await this.processes.wait(1);
     }
 

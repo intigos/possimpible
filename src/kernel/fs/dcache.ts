@@ -56,19 +56,4 @@ export class DirectoryCache{
     lookup(parent: IDEntry, name: string){
         return parent.subentry.find(x => x.name == name);
     }
-
-    path(path: IPath){
-        let buf = "";
-        let p: IPath|undefined = path;
-        while(p){
-            let entry:any = p.entry;
-            let mount = p.mount;
-            while(entry.parent != null){
-                buf += "/" + entry.name;
-                entry = entry.parent;
-            }
-            p = this.kernel.vfs.mounts.lookupMountpoint(mount!);
-        }
-        return buf.length ? buf : "/";
-    }
 }

@@ -35,13 +35,14 @@ function init(kernel: Kernel){
 }
 
 const containerOperations: IContainerOperations = {
-    run:(container, argv, code, listener) =>{
+    run:(container, params) =>{
         const buck = workers.get(container.id)!;
-        buck.handler = listener;
+        buck.handler = params.listener;
         const msg: IProcStart = {
             id: "",
-            code: code,
-            argv: argv,
+            code: params.code,
+            argv: params.argv,
+            dyna: params.dyna,
             type: MessageType.START,
         }
         container.status = ContainerStatus.RUNNING;
