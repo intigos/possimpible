@@ -29,7 +29,7 @@ module.exports = (env = {}) => ({
         publicPath: '/',
         chunkFilename: 'js/[name].js'
     },
-
+    stats: 'summary',
     plugins: [
         new webpack.DefinePlugin({
         }),

@@ -1,7 +1,8 @@
 import {Kernel} from "../../kernel";
 import {IKernelModule} from "../../sys/modules";
 import {IFileOperations, IFileSystemType, IINode, IINodeOperations, ISuperBlock} from "../vfs";
-import {d_alloc, IDEntry} from "../dcache";
+import {IDEntry} from "../dcache";
+import {IDirectoryEntry} from "../../../public/api";
 
 
 const inodeOperators: IINodeOperations = {
@@ -31,6 +32,17 @@ const fileOperations: IFileOperations = {
     },
     write: (file, buf) => {
         file.dentry.inode.map.content += buf;
+    },
+    iterate: async (file) => {
+        return new Promise<IDirectoryEntry[]>(resolve => {
+            if (file.dentry.inode.map.files) {
+                resolve(file.dentry.inode.map.files.map(x => {
+                    return {name:x.name};
+                }));
+            }else{
+                resolve([]);
+            }
+        })
     }
 }
 
@@ -38,7 +50,7 @@ async function mount(device: string): Promise<ISuperBlock>{
     let txt = await(await (await fetch(device)).blob()).text();
     let content = JSON.parse(txt);
 
-    const entry = d_alloc(null, "");
+    const entry = KERNEL.vfs.dcache.alloc(null, "");
     entry.inode = {
         mode: true,
         user: true,
@@ -50,6 +62,7 @@ async function mount(device: string): Promise<ISuperBlock>{
     return {
         root: entry,
         device: "blob",
+        fileSystemType: fs,
         superblockOperations:{},
     }
 }
@@ -58,8 +71,9 @@ const fs: IFileSystemType = {
     name:"blobfs",
     mount: mount
 }
-
+let KERNEL;
 function init(kernel: Kernel){
+    KERNEL = kernel;
     kernel.vfs.registerFS(fs);
 }
 

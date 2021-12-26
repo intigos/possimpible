@@ -1,10 +1,20 @@
 import {Kernel} from "../kernel";
 import {v4 as UUID} from 'uuid';
-import {IProcMessage, IProcWrite, MessageType} from "../../shared/proc";
+import {
+    IProcExec, IProcExecRes,
+    IProcGetCwdRes,
+    IProcGetDEnts,
+    IProcGetDEntsRes,
+    IProcMessage,
+    IProcOpen,
+    IProcOpenRes,
+    IProcRead,
+    IProcReadRes,
+    IProcWrite,
+    MessageType
+} from "../../shared/proc";
 import {IContainer} from "./orchestrator";
 import {IFile, IPath} from "../fs/vfs";
-import {IVFSMount} from "../fs/mount";
-import {IDEntry} from "../fs/dcache";
 
 type pid = number;
 
@@ -68,17 +78,77 @@ export class ProcessManagement{
         }
     }
 
-    handleProcess(message: IProcMessage, container: IContainer){
+    async handleProcess(message: IProcMessage, container: IContainer) {
         const process = this.containers.get(container.id)!;
-        switch(message.type){
-            case MessageType.WRITE:
-                const write = message as IProcWrite;
+        switch (message.type) {
+            case MessageType.WRITE: {
+                let write = message as IProcWrite;
                 const file = process.task.files.fileDescriptors[write.fd];
                 file.operations.write(file, write.buf);
+                break;
+            }
+            case MessageType.READ: {
+                let read = message as IProcRead;
+                const file = process.task.files.fileDescriptors[read.fd];
+                let buf = await file.operations.read(file, read.count);
+                const res: IProcReadRes = {
+                    type: MessageType.READ_RES,
+                    id: message.id,
+                    buf
+                }
+                container.operations.send(container, res)
+                break;
+            }
+            case MessageType.GETCWD: {
+                const res: IProcGetCwdRes = {
+                    type: MessageType.GETCWD_RES,
+                    id: message.id,
+                    cwd: this.kernel.vfs.dcache.path(process.task.pwd)
+                }
+                container.operations.send(container, res)
+                break;
+            }
+            case MessageType.OPEN: {
+                let open = message as IProcOpen;
+                let cwd = process.task.pwd;
+                let entry = this.kernel.vfs.lookup(cwd.entry, cwd.mount, open.path)!;
+                let file = this.kernel.vfs.open(entry);
+
+                let fd = process.task.files.fileDescriptors.push(file) - 1;
+                const res: IProcOpenRes = {
+                    type: MessageType.OPEN_RES,
+                    id: message.id,
+                    fd
+                }
+                container.operations.send(container, res)
+                break;
+            }
+            case MessageType.GETDENTS: {
+                let getdents = message as IProcGetDEnts;
+                const file = process.task.files.fileDescriptors[getdents.fd];
+
+                const res: IProcGetDEntsRes = {
+                    type: MessageType.GETDENTS_RES,
+                    id: message.id,
+                    dirents: await file.operations.iterate(file)
+                }
+                container.operations.send(container, res)
+                break;
+            }
+
+            case MessageType.EXEC: {
+                let exec = message as IProcExec;
+                let task = await this.createProcess(exec.path, exec.argv, process.task);
+
+                const res: IProcExecRes = {
+                    type: MessageType.EXEC_RES,
+                    id: message.id,
+                    pid: task.pid
+                }
+                container.operations.send(container, res)
+                break;
+            }
         }
-
-
-        console.log(message);
     }
 
     async createInitProcess(path: string, root: IPath){
@@ -101,9 +171,12 @@ export class ProcessManagement{
             parent: undefined,
         };
 
+        let stdinp = this.kernel.vfs.lookup(root.entry, root.mount, "/dev/console")!;
+        let stdin = this.kernel.vfs.open(stdinp);
+        task.files.fileDescriptors[0] = stdin;
+
         let stdoutp = this.kernel.vfs.lookup(root.entry, root.mount, "/dev/console")!;
         let stdout = this.kernel.vfs.open(stdoutp);
-
         task.files.fileDescriptors[1] = stdout;
 
         const process: IProcess = {
@@ -114,19 +187,19 @@ export class ProcessManagement{
         this.pool.set(task.pid, process)
         this.containers.set(container.id, process);
 
-        container.operations.run(container, content, this.handleProcess.bind(this));
+        container.operations.run(container, [path].concat([]), content, this.handleProcess.bind(this));
 
         return task;
     }
 
-    async createProcess(path: string, parent: ITask): Promise<ITask> {
+    async createProcess(path: string, argv:string[], parent: ITask): Promise<ITask> {
         let entry = this.kernel.vfs.lookup(parent.pwd.entry!, parent.pwd.mount!, path)!;
         let file = this.kernel.vfs.open(entry);
-        let content = file.operations.read(file, -1);
+        let content = await file.operations.read(file, -1);
 
         let lorch = this.kernel.orchestrators.getOrchestrator("lorch")!;
         let container = await lorch.getcontainer();
-        container.operations.run(container, content, this.handleProcess.bind(this));
+        container.operations.run(container, [path].concat(argv), content, this.handleProcess.bind(this));
 
         const task: ITask = {
             status: ITaskStatus.RUNNGING,
@@ -137,6 +210,15 @@ export class ProcessManagement{
             files: {fileDescriptors:[]},
             parent: parent ? parent.pid : undefined,
         };
+
+        let stdinp = this.kernel.vfs.lookup(parent.pwd.entry, parent.pwd.mount, "/dev/console")!;
+        let stdin = this.kernel.vfs.open(stdinp);
+        task.files.fileDescriptors[0] = stdin;
+
+        let stdoutp = this.kernel.vfs.lookup(parent.pwd.entry, parent.pwd.mount, "/dev/console")!;
+        let stdout = this.kernel.vfs.open(stdoutp);
+        task.files.fileDescriptors[1] = stdout;
+
         const process: IProcess = {
             container,
             task,

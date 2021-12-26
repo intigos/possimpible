@@ -1,7 +1,8 @@
 import {v4 as UUID } from 'uuid';
 import {Kernel} from "../kernel";
-import {d_alloc, d_lookup, IDEntry, IDEntryOperations} from "./dcache";
+import {DirectoryCache, IDEntry, IDEntryOperations} from "./dcache";
 import {IVFSMount, MountManager} from "./mount";
+import {IDirectoryEntry} from "../../public/api";
 
 export interface IFileSystemType{
     name: string;
@@ -31,6 +32,7 @@ export interface IFileOperations {
     open: (node: IINode) => IFile
     read: (file: IFile, count: number) => Promise<string>;
     write: (file: IFile, buf: string) => void;
+    iterate: (file: IFile) => Promise<IDirectoryEntry[]>;
 }
 
 export interface IINode {
@@ -44,6 +46,7 @@ export interface IINode {
 export interface ISuperBlock{
     device: any;
     root: IDEntry;
+    fileSystemType: IFileSystemType,
     superblockOperations: ISuperBlockOperations;
 }
 
@@ -62,6 +65,7 @@ const DIV = "/"
 function splitInSegments(path: string): string[]{
     const seg : string[] = [];
     if (!path.length) return seg;
+    if (path == "/") return [''];
     let buf = "";
     for(let i=0; i< path.length; i++){
         let c = path[i];
@@ -87,11 +91,13 @@ export class VirtualFileSystem{
     filesystems: Record<string, IFileSystemType> = {};
     root: IDEntry|undefined;
     private kernel: Kernel;
-    private mounts: MountManager;
+    public mounts: MountManager;
+    public dcache: DirectoryCache;
 
     constructor(kernel: Kernel) {
-        this.mounts = new MountManager();
         this.kernel = kernel;
+        this.mounts = new MountManager(this.kernel);
+        this.dcache = new DirectoryCache(this.kernel);
     }
 
     async mount(device: string, mount: IVFSMount|null, entry: IDEntry, filesystem:IFileSystemType): Promise<IVFSMount>{
@@ -124,10 +130,10 @@ export class VirtualFileSystem{
             let pivot: IPath = {entry:mount.root, mount};
             while(seg.length){
                 component = seg.shift()!;
-                let child = d_lookup(pivot.entry, component);
+                let child = this.dcache.lookup(pivot.entry, component);
 
                 if(!child){
-                    child = d_alloc(pivot.entry, component);
+                    child = this.dcache.alloc(pivot.entry, component);
                     let other = pivot.entry?.inode!.operations.lookup(pivot.entry?.inode!, child);
                     if(other){
                         // ??
@@ -135,7 +141,7 @@ export class VirtualFileSystem{
                 }
 
                 if(child.mounted){
-                    pivot.mount = this.mounts.lookup(mount, child)!;
+                    pivot.mount = this.mounts.lookupChild(mount, child)!;
                     pivot.entry = pivot.mount.root;
                 }else{
                     pivot.entry = child;
@@ -143,7 +149,7 @@ export class VirtualFileSystem{
             }
             return pivot;
         }else{
-            let entry = d_alloc(null, component);
+            let entry = this.dcache.alloc(null, component);
             return { mount: null, entry: entry }
         }
 

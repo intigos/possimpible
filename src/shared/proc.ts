@@ -10,11 +10,15 @@ export enum MessageType{
     OPEN,
     CLOSE,
     GETDENTS,
+    GETCWD,
+    EXEC,
 
     READ_RES,
     WRITE_RES,
     OPEN_RES,
     GETDENTS_RES,
+    GETCWD_RES,
+    EXEC_RES,
 }
 
 export interface IProcMessage{
@@ -24,7 +28,8 @@ export interface IProcMessage{
 
 export interface IProcStart extends IProcMessage{
     type: MessageType.START,
-    code: string
+    code: string,
+    argv: string[]
 }
 
 export interface IProcRead extends IProcMessage{
@@ -75,4 +80,24 @@ export interface IProcGetDEnts extends IProcMessage{
 export interface IProcGetDEntsRes extends IProcMessage{
     type:MessageType.GETDENTS_RES,
     dirents: IDirectoryEntry[]
+}
+
+export interface IProcGetCwd extends IProcMessage{
+    type: MessageType.GETCWD,
+}
+
+export interface IProcGetCwdRes extends IProcMessage{
+    type: MessageType.GETCWD_RES,
+    cwd: string
+}
+
+export interface IProcExec extends IProcMessage{
+    type: MessageType.EXEC,
+    path: string
+    argv: string[]
+}
+
+export interface IProcExecRes extends IProcMessage{
+    type: MessageType.EXEC_RES,
+    pid:number
 }

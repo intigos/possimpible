@@ -29,18 +29,19 @@ function init(kernel: Kernel){
                 resolve,
             }
             workers.set(id, buck)
-            wrk.addEventListener("message", ev => handleMessage(ev, buck));
+            wrk.addEventListener("message", async ev => await handleMessage(ev, buck));
         })
     })
 }
 
 const containerOperations: IContainerOperations = {
-    run:(container, code, listener) =>{
+    run:(container, argv, code, listener) =>{
         const buck = workers.get(container.id)!;
         buck.handler = listener;
         const msg: IProcStart = {
             id: "",
             code: code,
+            argv: argv,
             type: MessageType.START,
         }
         container.status = ContainerStatus.RUNNING;
@@ -59,17 +60,17 @@ const containerOperations: IContainerOperations = {
 }
 
 
-function handleMessage(message: MessageEvent<IProcMessage>, bucket: WorkerBucket){
-    if(message.data.type == MessageType.READY){
+async function handleMessage(message: MessageEvent<IProcMessage>, bucket: WorkerBucket) {
+    if (message.data.type == MessageType.READY) {
         bucket.container = {
             id: bucket.id,
             status: ContainerStatus.WAITING,
             operations: containerOperations
         };
         bucket.resolve(bucket.container)
-    }else{
+    } else {
         if (bucket.handler) {
-            bucket.handler(message.data, bucket.container!);
+            await bucket.handler(message.data, bucket.container!);
         }
     }
 }

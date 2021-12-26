@@ -17,7 +17,7 @@ interface IOrchestrator{
 
 export interface IContainerOperations {
     send: (container: IContainer, message:IProcMessage) => void,
-    run: (container: IContainer, code: string, listener: (message:IProcMessage, container: IContainer) => void) => void
+    run: (container: IContainer, argv: string[], code: string, listener: (message:IProcMessage, container: IContainer) => void) => void
     kill: (container: IContainer) => void
 }
 

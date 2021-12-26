@@ -1,7 +1,7 @@
 const fs = require("fs");
 
 // load toolchain files
-console.log("building initrd");
+process.stdout.write("building initrd... ");
 let rawdata = fs.readFileSync('config/toolchain.json');
 let toolchainConfig = JSON.parse(rawdata.toString());
 
@@ -21,13 +21,17 @@ const result = {
         {
             name:"dev",
             files:[]
+        },
+        {
+            name:"proc",
+            files:[]
         }
     ]
 }
-
-fs.writeFile('dist/initrd.img', JSON.stringify(result), (err) => {
+const buf = JSON.stringify(result);
+fs.writeFile('dist/initrd.img', buf, (err) => {
     if (err) throw err;
-    console.log('done');
+    console.log(`size ${buf.length} done`);
 });
 
 

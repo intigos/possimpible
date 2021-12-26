@@ -17,5 +17,7 @@ export interface ISystemCalls{
     write: (fd: FileDescriptor, buf: string) => void,
     open: (path: string, flags: OpenOptions) => Promise<FileDescriptor>,
     getdents: (fd: FileDescriptor, count: number) => Promise<IDirectoryEntry[]>,
-    close: (fd: FileDescriptor) => void
+    getcwd: () => Promise<string>,
+    close: (fd: FileDescriptor) => void,
+    exec: (path: string, argv: string[]) => Promise<number>
 }

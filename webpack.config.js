@@ -21,7 +21,7 @@ module.exports = (env = {}) => ({
         publicPath: '/',
         chunkFilename: 'js/[name].js'
     },
-
+    stats: 'summary',
     plugins: [
         new webpack.DefinePlugin({
             __VUE_OPTIONS_API__: 'true',

@@ -10,6 +10,7 @@ import initrd from "&/initrd.img";
 
 class TerminalDevice extends TTYDevice{
     private term: Terminal;
+    private resolve: ((value: (string | PromiseLike<string>)) => void) | undefined;
     private buffer: string = "";
 
     constructor(el: HTMLElement) {
@@ -20,16 +21,27 @@ class TerminalDevice extends TTYDevice{
         this.term.loadAddon(fitAddon);
 
         this.term.onData((data) => {
-            this.buffer += data
+            if(this.resolve && this.buffer.length == 0){
+                this.resolve(data);
+                this.resolve = undefined;
+            }else{
+                this.buffer += data
+            }
+
         })
         fitAddon.fit();
         this.term.open(el);
     }
 
-    read(count:number): string {
-        const data = this.buffer;
-        this.buffer = "";
-        return data;
+    async read(count:number): Promise<string> {
+        return new Promise<string>(resolve => {
+            if(this.buffer.length){
+                resolve(this.buffer);
+                this.buffer = "";
+            }else{
+                this.resolve = resolve;
+            }
+        });
     }
 
     write(str: string) {

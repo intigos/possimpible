@@ -1,5 +1,5 @@
 import {
-    IProcClose, IProcGetDEnts, IProcGetDEntsRes,
+    IProcClose, IProcExec, IProcExecRes, IProcGetCwd, IProcGetCwdRes, IProcGetDEnts, IProcGetDEntsRes,
     IProcMessage, IProcOpen, IProcOpenRes,
     IProcRead,
     IProcReadRes,
@@ -12,13 +12,17 @@ import {FileDescriptor, IDirectoryEntry, ISystemCalls, OpenOptions} from "../pub
 
 export class Process{
     private router = new Map<MessageID, (message: IProcMessage) => void>();
+    public argv?: string[]
     public sys : ISystemCalls = {
         read: this.sys_read.bind(this),
         write: this.sys_write.bind(this),
         open: this.sys_open.bind(this),
+        getcwd: this.sys_getcwd.bind(this),
         getdents: this.sys_getdents.bind(this),
-        close: this.sys_close.bind(this)
+        close: this.sys_close.bind(this),
+        exec: this.sys_exec.bind(this)
     }
+
     private uuidv4() {
         return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
             const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
@@ -40,6 +44,7 @@ export class Process{
             }
         }else if(message.type == MessageType.START){
             let startMsg = message as IProcStart;
+            this.argv = startMsg.argv;
             eval(startMsg.code);
         }
     }
@@ -112,5 +117,27 @@ export class Process{
         const res = await this.callWithPromise(param) as IProcGetDEntsRes;
 
         return res.dirents;
+    }
+
+    private async sys_getcwd() : Promise<string>{
+        const param: IProcGetCwd = {
+            type: MessageType.GETCWD,
+            id: this.uuidv4()
+        };
+        const res = await this.callWithPromise(param) as IProcGetCwdRes;
+
+        return res.cwd;
+    }
+
+    private async sys_exec(path: string, argv:string[]) : Promise<number>{
+        const param: IProcExec = {
+            type: MessageType.EXEC,
+            id: this.uuidv4(),
+            path: path,
+            argv: argv
+        };
+        const res = await this.callWithPromise(param) as IProcExecRes;
+
+        return res.pid;
     }
 }
