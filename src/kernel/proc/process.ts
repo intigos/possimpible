@@ -297,6 +297,7 @@ export class ProcessManagement{
             }
         }
         procRemove(process.task.proc.fd);
+        procRemove(process.task.proc.dir);
         for(let release of process.task.waits){
             release("");
         }

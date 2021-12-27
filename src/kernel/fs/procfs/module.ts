@@ -9,7 +9,7 @@ import {
     ISuperBlock
 } from "../vfs";
 import {IDevice} from "../../sys/devices";
-import {} from "../dcache";
+import {IDEntryOperations} from "../dcache";
 import {IDirectoryEntry} from "../../../public/api";
 
 export interface IProcFSOperations{
@@ -18,6 +18,7 @@ export interface IProcFSOperations{
 }
 
 export interface IProcFSEntry{
+    valid: boolean;
     name: string;
     parent: IProcFSEntry|null;
     operations?: IProcFSOperations;
@@ -25,6 +26,7 @@ export interface IProcFSEntry{
 }
 
 const proctree: IProcFSEntry = {
+    valid: true,
     name: "",
     parent: null,
     operations: undefined,
@@ -37,6 +39,7 @@ export function procCreate(name:string, parent:IProcFSEntry|null, operations:IPr
     }
     const entry = {
         name,
+        valid: true,
         parent: parent,
         operations,
         children: []
@@ -52,6 +55,7 @@ export function procMkdir(name:string, parent:IProcFSEntry|null): IProcFSEntry{
     const entry = {
         name,
         parent: parent,
+        valid: true,
         operations: undefined,
         children: []
     };
@@ -60,9 +64,10 @@ export function procMkdir(name:string, parent:IProcFSEntry|null): IProcFSEntry{
 }
 
 export function procRemove(entry:IProcFSEntry){
-    const index = entry.children.indexOf(entry);
+    const index = entry.parent!.children.indexOf(entry);
     if (index > -1) {
-        entry.children.splice(index, 1);
+        entry.parent!.children.splice(index, 1);
+        entry.valid = false;
     }
 }
 
@@ -111,6 +116,13 @@ const fileOperations: IFileOperations = {
     }
 }
 
+const dentryOperations: IDEntryOperations = {
+    revalidate(dentry) : boolean{
+        debugger
+        return dentry.inode?.map.valid;
+    }
+}
+
 async function mount(device: string): Promise<ISuperBlock>{
     let entry = KERNEL.vfs.dcache.alloc(null, "");
     entry.inode = {
@@ -119,6 +131,9 @@ async function mount(device: string): Promise<ISuperBlock>{
         map: proctree,
         operations: inodeOperators,
         fileOperations: fileOperations
+    }
+    entry.operations = {
+
     }
     return {
         device: "dev",

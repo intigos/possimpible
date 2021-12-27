@@ -3,7 +3,7 @@ import {IINode, IPath, ISuperBlock} from "./vfs";
 import {Kernel} from "../kernel";
 
 export interface IDEntryOperations {
-
+    revalidate?: (dentry: IDEntry) => boolean
 }
 
 export interface IDEntry {
@@ -18,13 +18,14 @@ export interface IDEntry {
 
 export class DirectoryCache{
     private kernel: Kernel;
+    private dentries : IDEntry[] = [];
 
     constructor(kernel: Kernel) {
         this.kernel = kernel;
     }
 
-    allocAnon(sb: ISuperBlock, name: string): IDEntry{
-        return {
+    allocAnon(sb: ISuperBlock|null, name: string): IDEntry{
+        let dentry:IDEntry = {
             mounted: false,
             name: name,
             inode: null,
@@ -32,6 +33,8 @@ export class DirectoryCache{
             operations: {},
             subentry: []
         }
+        this.dentries.push(dentry);
+        return dentry;
     }
 
     alloc(parent: IDEntry|null, name: string): IDEntry{
@@ -41,15 +44,16 @@ export class DirectoryCache{
             dentry.parent = parent;
             parent.subentry.push(dentry);
             return dentry;
-        }else{
-            return {
-                mounted: false,
-                name: name,
-                inode: null,
-                superblock: null,
-                operations: null,
-                subentry: []
-            }
+        }else {
+            return this.allocAnon(null, name);
+        }
+    }
+
+    invalidate(dentry: IDEntry){
+        let array = dentry.parent?.subentry!
+        const index = array.indexOf(dentry);
+        if (index > -1) {
+            array.splice(index, 1);
         }
     }
 

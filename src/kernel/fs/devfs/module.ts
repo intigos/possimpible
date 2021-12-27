@@ -53,7 +53,7 @@ const fileOperations: IFileOperations = {
                 resolve(Array.from(map.keys()).map(x => {
                     return {name: x};
                 }));
-            } else{
+            } else {
                 resolve([] as IDirectoryEntry[]);
             }
         })

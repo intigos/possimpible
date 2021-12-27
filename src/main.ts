@@ -15,7 +15,7 @@ class TerminalDevice extends TTYDevice{
 
     constructor(el: HTMLElement) {
         super();
-        this.term = new Terminal();
+        this.term = new Terminal({fontFamily:"JetBrains Mono", fontSize:13});
         const fitAddon = new FitAddon();
 
         this.term.loadAddon(fitAddon);
