@@ -44,7 +44,8 @@ module.exports = (env = {}) => ({
                 options: {
                     transpileOnly: true,
                     happyPackMode: false,
-                    configFile: "tsconfig.json"
+
+                    configFile: "src/toolchain/tsconfig.json"
                 }
             },
         ],
@@ -85,11 +86,15 @@ module.exports = (env = {}) => ({
             }),
         ],
     },
+    externals: {
+        libts: 'libts',
+    },
+    stats: 'errors-only',
     resolve: {
         extensions: ['.ts', '.js', '.vue', '.json'],
         alias: {
             '@': '/Users/nurv/git/intigos/possimpible/src',
-            '&': '/Users/nurv/git/intigos/possimpible/dist',
+            '#': '/Users/nurv/git/intigos/possimpible/src/libs/include',
         },
     },
 });

@@ -11,8 +11,8 @@
         "esModuleInterop": true,
         "allowSyntheticDefaultImports": true,
         "sourceMap": true,
-        "baseUrl": ".",
-        "outDir": "dist/toolchain/",
+        "baseUrl": "./",
+        "outDir": "../../../dist/libs/",
         "paths": {
             "@/*": [
                 "src/*"
@@ -27,8 +27,8 @@
         ]
     },
     "include": [
-        "../../public/**/*.ts",
-        "src/**/*.ts"
+        "../public/**/*.ts",
+        "./libts/src/**/*.ts"
     ],
     "exclude": [
         "node_modules"

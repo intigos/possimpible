@@ -11,7 +11,7 @@
     "compileexecs": "./node_modules/webpack/bin/webpack.js --config webpack.toolchain.js",
     "buildtoolchain": "yarn compiletoolchain && yarn run buildinitrd",
     "compiletoolchain": "yarn compilelibraries && yarn compileexecs",
-    "buildinitrd": "ts-node utils/buildimg.ts",
+    "buildinitrd": "ts-node -T utils/buildimg.ts",
     "compilelibraries": "./node_modules/webpack/bin/webpack.js --config webpack.libraries.js",
     "build": "yarn run buildworker && yarn run buildtoolchain && yarn run buildboot"
   },
@@ -28,7 +28,9 @@
     "xterm-addon-web-links": "^0.4.0"
   },
   "devDependencies": {
+    "@types/argparse": "^2.0.10",
     "@types/node": "^17.0.4",
+    "argparse": "^2.0.1",
     "browserify": "^17.0.0",
     "case-sensitive-paths-webpack-plugin": "^2.4.0",
     "copy-webpack-plugin": "^10.2.0",

@@ -18,7 +18,7 @@ let toolchainConfig = JSON.parse(rawdata);
 
 const entrypoints = {}
 toolchainConfig.libs.forEach(x => {
-    entrypoints[x] = [path.resolve(__dirname, `./src/toolchain/${x}/src/main.ts`)]
+    entrypoints[x] = [path.resolve(__dirname, `./src/libs/${x}/src/main.ts`)]
 })
 
 module.exports = (env = {}) => ({
@@ -26,7 +26,7 @@ module.exports = (env = {}) => ({
     devtool: env.prod ? 'source-map' : 'eval-cheap-module-source-map',
     entry: entrypoints,
     output: {
-        path: path.resolve(__dirname, './dist/toolchain/'),
+        path: path.resolve(__dirname, './dist/libs/'),
         filename: 'js/[name].js',
         library: {
             name: "[name]",
@@ -48,7 +48,7 @@ module.exports = (env = {}) => ({
                 options: {
                     transpileOnly: true,
                     happyPackMode: false,
-                    configFile: "tsconfig.json"
+                    configFile: "src/libs/tsconfig.json"
                 }
             },
         ],
@@ -89,6 +89,7 @@ module.exports = (env = {}) => ({
             }),
         ],
     },
+    stats: 'errors-only',
     resolve: {
         extensions: ['.ts', '.js', '.vue', '.json'],
         alias: {

@@ -113,7 +113,6 @@ module.exports = (env = {}) => ({
                 test: /\.tsx?$/,
                 loader: 'ts-loader',
                 options: {
-                    transpileOnly: true,
                     happyPackMode: false,
                     appendTsSuffixTo: [/\.vue$/],
                 }
@@ -167,6 +166,7 @@ module.exports = (env = {}) => ({
             "Cross-Origin-Embedder-Policy": "require-corp"
         }
     },
+    stats: 'errors-only',
     resolve: {
         extensions: ['.ts', '.js', '.vue', '.json'],
         alias: {

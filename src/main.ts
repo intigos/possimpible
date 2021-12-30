@@ -15,7 +15,9 @@ class TerminalDevice extends TTYDevice{
 
     constructor(el: HTMLElement) {
         super();
-        this.term = new Terminal({fontFamily:"JetBrains Mono", fontSize:13});
+        this.term = new Terminal({
+            fontSize:13
+        });
         const fitAddon = new FitAddon();
 
         this.term.loadAddon(fitAddon);
@@ -33,15 +35,16 @@ class TerminalDevice extends TTYDevice{
         this.term.open(el);
     }
 
-    async read(count:number): Promise<string> {
-        return new Promise<string>(resolve => {
+    async read(count: number): Promise<string> {
+        return new Promise<string>(x =>{
             if(this.buffer.length){
-                resolve(this.buffer);
+                x(this.buffer);
                 this.buffer = "";
             }else{
-                this.resolve = resolve;
+                this.resolve = x;
+
             }
-        });
+        })
     }
 
     write(str: string) {
@@ -49,10 +52,11 @@ class TerminalDevice extends TTYDevice{
     }
 }
 
-const kernel = new Kernel({
-    tty: new TerminalDevice(document.getElementById("term")!),
-    initrd: initrd,
-    initrc: "/bin/psh"
-});
-
-setTimeout(async () => await kernel.boot(), 0)
+window.onload = async () => setTimeout(async x => {
+    const kernel = new Kernel({
+        tty: new TerminalDevice(document.getElementById("term")!),
+        initrd: initrd,
+        initrc: "/bin/init"
+    });
+    await kernel.boot()
+}, 100);

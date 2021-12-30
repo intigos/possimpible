@@ -1,13 +1,13 @@
-import {v4 as UUID } from 'uuid';
 import {Kernel} from "../kernel";
-import {DirectoryCache, IDEntry, IDEntryOperations} from "./dcache";
+import {DirectoryCache, IDEntry} from "./dcache";
 import {IVFSMount, MountManager} from "./mount";
 import {IDirectoryEntry} from "../../public/api";
+import {IINode} from "./inode";
 
 export interface IFileSystemType{
     name: string;
     mount: (device: string) => Promise<ISuperBlock>;
-    killSuperBlock: (sb: ISuperBlock) => void;
+    unmount: (sb: ISuperBlock) => void;
 }
 
 export interface IPath{
@@ -15,7 +15,7 @@ export interface IPath{
     mount: IVFSMount|null;
 }
 
-interface ISuperBlockOperations{
+export interface ISuperBlockOperations{
     //  alloc_inode: this method is called by alloc_inode() to allocate memory
     //  	for struct inode and initialize it.  If this function is not
     //  	defined, a simple 'struct inode' is allocated.  Normally
@@ -52,7 +52,7 @@ interface ISuperBlockOperations{
     // 	old practice of using "force_delete" in the put_inode() case,
     // 	but does not have the races that the "force_delete()" approach
     // 	had.
-    drop_inode: (inode: IINode) => void;
+    drop_inode?: (inode: IINode) => void;
 
     //  put_super: called when the VFS wishes to free the superblock
     // 	(i.e. unmount). This is called with the superblock lock held
@@ -75,103 +75,10 @@ export enum MkNodeMode {
     PIPE
 }
 
-export interface IINodeOperations{
-    //  create: called by the open(2) and creat(2) system calls. Only
-    // 	required if you want to support regular files. The dentry you
-    // 	get should not have an inode (i.e. it should be a negative
-    // 	dentry). Here you will probably call d_instantiate() with the
-    // 	dentry and the newly created inode
-    create?: (inode: IINode, dentry: IDEntry, create:boolean) => void;
-
-    //  lookup: called when the VFS needs to look up an inode in a parent
-    // 	directory. The name to look for is found in the dentry. This
-    // 	method must call d_add() to insert the found inode into the
-    // 	dentry. The "i_count" field in the inode structure should be
-    // 	incremented. If the named inode does not exist a NULL inode
-    // 	should be inserted into the dentry (this is called a negative
-    // 	dentry). Returning an error code from this routine must only
-    // 	be done on a real error, otherwise creating inodes with system
-    // 	calls like create(2), mknod(2), mkdir(2) and so on will fail.
-    // 	If you wish to overload the dentry methods then you should
-    // 	initialise the "d_dop" field in the dentry; this is a pointer
-    // 	to a struct "dentry_operations".
-    // 	This method is called with the directory inode semaphore held
-    lookup: (node: IINode, dentry: IDEntry) => IDEntry|null
-
-    //  link: called by the link(2) system call. Only required if you want
-    // 	to support hard links. You will probably need to call
-    // 	d_instantiate() just as you would in the create() method
-    link?: (olddentry :IDEntry, inode :IINode, dentry: IDEntry) => void;
-
-    //  unlink: called by the unlink(2) system call. Only required if you
-    // 	want to support deleting inodes
-    unlink?: (inode :IINode, dentry: IDEntry) => void;
-
-    //  symlink: called by the symlink(2) system call. Only required if you
-    // 	want to support symlinks. You will probably need to call
-    // 	d_instantiate() just as you would in the create() method
-    symlink?: (inode: IINode, dentry: IDEntry, name: string) => void;
-
-    //  mkdir: called by the mkdir(2) system call. Only required if you want
-    // 	to support creating subdirectories. You will probably need to
-    // 	call d_instantiate() just as you would in the create() method
-    mkdir?: (inode: IINode, dentry: IDEntry) => void;
-
-    //  rmdir: called by the rmdir(2) system call. Only required if you want
-    // 	to support deleting subdirectories
-    rmdir?: (inode: IINode, dentry: IDEntry) => void;
-
-    //  mknod: called by the mknod(2) system call to create a device (char,
-    // 	block) inode or a named pipe (FIFO) or socket. Only required
-    // 	if you want to support creating these types of inodes. You
-    // 	will probably need to call d_instantiate() just as you would
-    // 	in the create() method
-    mknod?: (inode: IINode, dentry: IDEntry, mode: MkNodeMode) => void;
-
-    //  rename: called by the rename(2) system call to rename the object to
-    // 	have the parent and name given by the second inode and dentry.
-    //
-    // 	The filesystem must return -EINVAL for any unsupported or
-    // 	unknown	flags.  Currently the following flags are implemented:
-    // 	(1) RENAME_NOREPLACE: this flag indicates that if the target
-    // 	of the rename exists the rename should fail with -EEXIST
-    // 	instead of replacing the target.  The VFS already checks for
-    // 	existence, so for local filesystems the RENAME_NOREPLACE
-    // 	implementation is equivalent to plain rename.
-    // 	(2) RENAME_EXCHANGE: exchange source and target.  Both must
-    // 	exist; this is checked by the VFS.  Unlike plain rename,
-    // 	source and target may be of different type.
-    rename?: (oldinode: IINode, olddentry: IDEntry, inode: IINode, dentry: IDEntry) => void;
-
-    //  This function is called by the VFS to translate a symbolic
-    //  link to the inode to which it points. The link pointed at by
-    //  dentry is translated and the result is stored in the nameidata
-    //  structure pointed at by nd.
-    followLink?: (dentry: IDEntry, nd: any) => void;
-
-    //  permission: called by the VFS to check for access rights on a POSIX-like
-    //   	filesystem.
-    //
-    // 	May be called in rcu-walk mode (mask & MAY_NOT_BLOCK). If in rcu-walk
-    //         mode, the filesystem must check the permission without blocking or
-    // 	storing to the inode.
-    //
-    // 	If a situation is encountered that rcu-walk cannot handle, return
-    // 	-ECHILD and it will be called again in ref-walk mode.
-    permission?: (dentry: IDEntry, permissions: number) => void;
-
-    //  setattr: called by the VFS to set attributes for a file. This method
-    //  is called by chmod(2) and related system calls.
-    setattr: (dentry: IDEntry, attr: any) => void;
-
-    //  getattr: called by the VFS to get attributes of a file. This method
-    //  is called by stat(2) and related system calls.
-    getattr: (vfsmount: IVFSMount, dentry: IDEntry) => Promise<string>
-}
-
 export interface IFile {
     position: number;
-    dentry: any;
+    size: number;
+    dentry: IDEntry;
     operations: IFileOperations;
 }
 
@@ -188,11 +95,11 @@ export enum LockOperation{
     LOCK_NONBLOCK,
 }
 
-interface IPollTable {
+export interface IPollTable {
 }
 
 export interface IFileOperations {
-    open: (node: IINode) => IFile
+    open: (node: IINode, entry: IDEntry) => Promise<IFile>
 
     // The _llseek() system call repositions the offset of the open file
     // description associated with the file descriptor fd to the value
@@ -218,7 +125,7 @@ export interface IFileOperations {
     // a set of file descriptors to become ready to perform I/O.  The
     // Linux-specific epoll(7) API performs a similar task, but offers
     // features beyond those found in poll().
-    poll: (file: IFile, pollfd: IPollTable) => Promise<IDirectoryEntry>;
+    poll: (file: IFile, pollfd: IPollTable) => Promise<void>;
 
     // The ioctl() system call manipulates the underlying device
     // parameters of special files.  In particular, many operating
@@ -262,19 +169,16 @@ export interface IFileOperations {
     // Because this copying is done within the kernel, sendfile() is
     // more efficient than the combination of read(2) and write(2),
     // which would require transferring data to and from user space.
-    sendfile: (outfile: IFile, infile: IFile, offset: number, count: number) => void;
+    sendfile?: (outfile: IFile, infile: IFile, offset: number, count: number) => void;
 
-    read: (file: IFile, count: number) => Promise<string>;
-    write: (file: IFile, buf: string) => void;
+    read: (file: IFile, count?: number) => Promise<string>;
+    write?: (file: IFile, buf: string) => Promise<void>;
     iterate: (file: IFile) => Promise<IDirectoryEntry[]>;
 }
 
-export interface IINode {
-    mode: any;
-    user: any;
-    map: any;
-    operations: IINodeOperations;
-    fileOperations: IFileOperations
+export function dir_add_dots(list: IDirectoryEntry[]){
+    list.push({name:"."})
+    list.push({name:".."})
 }
 
 export interface ISuperBlock{
@@ -350,8 +254,8 @@ export class VirtualFileSystem{
         return this.filesystems[name];
     }
 
-    open(path: IPath): IFile{
-        const file = path.entry.inode!.fileOperations.open(path.entry.inode!);
+    async open(path: IPath): Promise<IFile>{
+        const file = await path.entry.inode!.fileOperations.open(path.entry.inode!, path.entry);
         file.dentry = path.entry;
         return file;
     }
@@ -400,7 +304,6 @@ export class VirtualFileSystem{
             while(seg.length){
                 component = seg.shift()!;
                 let child = this.dcache.lookup(pivot.entry, component);
-
                 if(!child || (child!.operations?.revalidate && child.operations?.revalidate(child))){
                     child = this.dcache.alloc(pivot.entry, component);
                     let other = pivot.entry?.inode!.operations.lookup(pivot.entry?.inode!, child);

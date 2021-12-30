@@ -5,24 +5,19 @@
         "strict": true,
         "jsx": "preserve",
         "importHelpers": true,
-
-        "declaration": true,
-        "declarationMap": true,
-        "declarationDir": "../../../dist/dts/libts",
-        "rootDir": "src",
-
         "moduleResolution": "node",
         "experimentalDecorators": true,
         "skipLibCheck": true,
         "esModuleInterop": true,
         "allowSyntheticDefaultImports": true,
         "sourceMap": true,
-        "baseUrl": ".",
-        "outDir": "../../../dist/toolchain/",
+        "baseUrl": "./init",
+        "outDir": "../../dist/toolchain",
         "paths": {
             "@/*": [
                 "src/*"
-            ]
+            ],
+            "libts": ["../libts/"]
         },
         "lib": [
             "esnext",
@@ -30,13 +25,18 @@
             "dom.iterable",
             "webworker",
             "scripthost"
-        ]
+        ],
+        "rootDirs": ["../libs/libts/includes", "src"]
     },
     "include": [
-        "../../public/**/*.ts",
-        "src/**/*.ts"
+        "../libs/libts/includes/libts.d.ts",
+        "../public/**/*.ts",
+        "cat/src/**/*.ts",
+        "init/src/**/*.ts",
+        "login/src/**/*.ts",
+        "psh/src/**/*.ts"
     ],
     "exclude": [
-        "node_modules"
+
     ]
 }

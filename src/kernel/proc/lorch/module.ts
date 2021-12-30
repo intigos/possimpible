@@ -14,12 +14,13 @@ interface WorkerBucket{
     handler?: (message: IProcMessage, container: IContainer) => void;
 }
 const workers = new Map<string, WorkerBucket>();
-
+const DEBUG = false;
 function init(kernel: Kernel){
     kernel.orchestrators.registerOrchestrator({
         name: "lorch",
         getcontainer: () => new Promise<IContainer>(resolve => {
             const id = UUID();
+            console.log(id);
             const wrk = new Worker(workerImage, {
                 name: "" + id
             });
@@ -29,7 +30,12 @@ function init(kernel: Kernel){
                 resolve,
             }
             workers.set(id, buck)
-            wrk.addEventListener("message", async ev => await handleMessage(ev, buck));
+            wrk.addEventListener("message", async ev => {
+                if(DEBUG){
+                    console.log("rx", ev.data);
+                }
+                await handleMessage(ev, buck)
+            });
         })
     })
 }
@@ -56,6 +62,9 @@ const containerOperations: IContainerOperations = {
     },
     send:(container, message) => {
         const buck = workers.get(container.id)!;
+        if(DEBUG){
+            console.log("tx", message);
+        }
         buck.worker.postMessage(message);
     }
 }

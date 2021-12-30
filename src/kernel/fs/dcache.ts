@@ -1,6 +1,7 @@
 
-import {IINode, IPath, ISuperBlock} from "./vfs";
+import {IPath, ISuperBlock} from "./vfs";
 import {Kernel} from "../kernel";
+import {IINode} from "./inode";
 
 export interface IDEntryOperations {
     revalidate?: (dentry: IDEntry) => boolean

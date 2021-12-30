@@ -50,6 +50,8 @@ export interface ITaskProcRefs{
 export interface ITask{
     status: ITaskStatus,
     pid: number,
+    uid: number,
+    gid: number,
     sys: any,
     proc: ITaskProcRefs,
     pwd: IPath;
@@ -100,13 +102,18 @@ export class ProcessManagement{
             case MessageType.WRITE: {
                 let write = message as IProcWrite;
                 const file = process.task.files.fileDescriptors[write.fd];
-                file.operations.write(file, write.buf);
+                if(file.operations.write){
+                    file.operations.write(file, write.buf);
+                }else{
+                    // TODO: throw error
+                }
                 break;
             }
             case MessageType.READ: {
                 let read = message as IProcRead;
                 const file = process.task.files.fileDescriptors[read.fd];
                 let buf = await file.operations.read(file, read.count);
+
                 const res: IProcReadRes = {
                     type: MessageType.READ_RES,
                     id: message.id,
@@ -128,7 +135,7 @@ export class ProcessManagement{
                 let open = message as IProcOpen;
                 let cwd = process.task.pwd;
                 let entry = this.kernel.vfs.lookup(cwd, open.path)!;
-                let file = this.kernel.vfs.open(entry);
+                let file = await this.kernel.vfs.open(entry);
 
                 let fd = process.task.files.fileDescriptors.push(file) - 1;
                 const res: IProcOpenRes = {
@@ -186,7 +193,7 @@ export class ProcessManagement{
 
     private async fetchDepCode(wd: IPath, dep:string): Promise<IDependency[]>{
         let entry = this.kernel.vfs.lookup(wd, `/lib/${dep}.dyna`)!;
-        let file = this.kernel.vfs.open(entry);
+        let file = await this.kernel.vfs.open(entry);
         let content = await file.operations.read(file, -1);
         let result: IDependency[] = [];
         if(!content.startsWith("dynalib:")){
@@ -207,14 +214,20 @@ export class ProcessManagement{
     private openFile(task: ITask, pos:number, file: IFile){
         task.files.fileDescriptors[pos] = file;
         task.proc.fds[pos] = procCreate("" + pos, task.proc.fd, {
-            write: (f, buf) => file.operations.write(file, buf),
+            write: async (f, buf) => {
+                if(file.operations.write){
+                    await file.operations.write(file, buf);
+                }
+            },
             read: (f, count) => file.operations.read(file, count)
         })
     }
 
+
+
     async createProcess(path: string, argv:string[], wd:IPath, parent: ITask|undefined): Promise<ITask> {
         let entry = this.kernel.vfs.lookup(wd, path)!;
-        let file = this.kernel.vfs.open(entry);
+        let file = await this.kernel.vfs.open(entry);
         let content = await file.operations.read(file, -1);
         if(!content.startsWith("PEXF:")){
             // TODO
@@ -235,6 +248,8 @@ export class ProcessManagement{
             operations: this.taskOperations,
             sys: true,
             pid: pid,
+            uid: parent ? parent.uid : 1,
+            gid: parent ? parent.gid : 1,
             waits: waits,
             proc: {
                 dir: p,
@@ -265,11 +280,10 @@ export class ProcessManagement{
         };
 
         let stdinp = this.kernel.vfs.lookup(wd, "/dev/console")!;
-        let stdin = this.kernel.vfs.open(stdinp);
+        let stdin = await this.kernel.vfs.open(stdinp);
         this.openFile(task, 0, stdin);
         this.openFile(task, 1, stdin);
         this.openFile(task, 2, stdin);
-
         container.operations.run(container, {
             code: pexfstruct.code,
             argv: [path].concat(argv),

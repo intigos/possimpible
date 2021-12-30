@@ -31,7 +31,6 @@ export class Kernel{
         this.processes = new ProcessManagement(this);
         this.orchestrators = new OrchestratorManagement(this);
         this.tty = this.options.tty || new NullDevice();
-        this.printk("Possimpible\n\r")
     }
     
     async boot(){
@@ -47,14 +46,14 @@ export class Kernel{
         }
         this.printk(`mounting initrd (size:${this.options.initrd.length}) into /`)
         const root = this.vfs.lookup(null, "/")!;
-        root.mount = await this.vfs.mount(this.options.initrd, root.mount, root.entry, this.vfs.getFS("blobfs"))
+        root.mount = await this.vfs.mount(this.options.initrd, root.mount, root.entry, this.vfs.getFS("blob"))
         root.entry = root.mount.superblock.root;
 
         const dev = this.vfs.lookup(root,"/dev")!;
-        await this.vfs.mount("", dev.mount, dev.entry, this.vfs.getFS("devfs"));
+        await this.vfs.mount("", dev.mount, dev.entry, this.vfs.getFS("dev"));
 
         const proc = this.vfs.lookup(root, "/proc")!;
-        await this.vfs.mount("", proc.mount, proc.entry, this.vfs.getFS("procfs"));
+        await this.vfs.mount("", proc.mount, proc.entry, this.vfs.getFS("proc"));
 
 
         this.printk(`exec ${this.options.initrc} into PID 1`)

@@ -4,6 +4,8 @@
   ],
   "execs": [
     "cat",
+    "init",
+    "login",
     "psh"
   ]
 }
