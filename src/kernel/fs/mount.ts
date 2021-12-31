@@ -80,16 +80,29 @@ export class MountManager{
         }
     }
 
-    // delete(parent: IVFSMount, dentry: IDEntry){
-    //     const mnt = this._lookup(parent, dentry);
-    //     if(mnt){
-    //         mnt.parent.children = mnt.parent.children.filter(x => x == mnt);
-    //         this.mounts.filter(x => x == mnt);
-    //         return;
-    //     }
-    //
-    //     throw "TODO";
-    // }
+    delete(parent: IVFSMount, dentry: IDEntry): ISuperBlock{
+        for (let i of this.mounts){
+            debugger;
+            if(i.mount.root == dentry){
+                const a = i.parent?.children!;
+                let index = a.indexOf(i);
+                if (index > -1) {
+                    a.splice(index, 1);
+                }
+
+                index = this.mounts.indexOf(i)
+                if (index > -1) {
+                    this.mounts.splice(index, 1);
+                }
+
+                i.mountpoint.mounted = false;
+                i.mountpoint.superblock = null;
+
+                return i.mount.superblock
+            }
+        }
+        throw "ERROR";
+    }
 }
 
 

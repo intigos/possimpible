@@ -14,6 +14,8 @@ export enum MessageType{
     EXEC,
     CHCWD,
     DIE,
+    MOUNT,
+    UNMOUNT,
 
     READ_RES,
     WRITE_RES,
@@ -22,6 +24,8 @@ export enum MessageType{
     GETCWD_RES,
     EXEC_RES,
     CHCWD_RES,
+    MOUNT_RES,
+    UNMOUNT_RES
 }
 
 export interface IProcMessage{
@@ -122,4 +126,25 @@ export interface IProcChCwdRes extends IProcMessage{
 
 export interface IProcDie extends IProcMessage{
     type: MessageType.DIE
+}
+
+export interface IProcMount extends IProcMessage{
+    type: MessageType.MOUNT,
+    fstype: string,
+    device: string,
+    options: string,
+    mountpoint: string
+}
+
+export interface IProcMountRes extends IProcMessage{
+    type: MessageType.MOUNT_RES
+}
+
+export interface IProcUnmount extends IProcMessage{
+    type: MessageType.UNMOUNT,
+    path: string
+}
+
+export interface IProcUnmountRes extends IProcMessage{
+    type: MessageType.UNMOUNT_RES,
 }

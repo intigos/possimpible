@@ -62,6 +62,8 @@ for (let libname of toolchainConfig.libs){
 
 let dev = makeINode([], "dev", root, BlobINodeType.DIRECTORY, sb)
 let proc = makeINode([], "proc", root, BlobINodeType.DIRECTORY, sb)
+let vvv = makeINode([], "var", root, BlobINodeType.DIRECTORY, sb)
+let tmp = makeINode([], "tmp", vvv, BlobINodeType.DIRECTORY, sb)
 process.stdout.write("building initrd... ");
 
 

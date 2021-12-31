@@ -6,6 +6,8 @@
     "cat",
     "init",
     "login",
-    "psh"
+    "psh",
+    "mount",
+    "umount"
   ]
 }

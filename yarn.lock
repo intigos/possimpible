@@ -2132,6 +2132,11 @@ follow-redirects@^1.0.0:
   resolved "https://registry.npmjs.org/follow-redirects/-/follow-redirects-1.14.6.tgz"
   integrity sha512-fhUl5EwSJbbl8AR+uYL2KQDxLkdSjZGR36xy46AO7cOMTrCMON6Sa28FmAnC2tRTDbd/Uuzz3aJBv7EBN7JH8A==
 
+fontfaceobserver@2.*:
+  version "2.1.0"
+  resolved "https://registry.yarnpkg.com/fontfaceobserver/-/fontfaceobserver-2.1.0.tgz#e2705d293e2c585a6531c2a722905657317a2991"
+  integrity sha512-ReOsO2F66jUa0jmv2nlM/s1MiutJx/srhAe2+TE8dJCMi02ZZOcCTxTCQFr3Yet+uODUtnr4Mewg+tNQ+4V1Ng==
+
 foreach@^2.0.5:
   version "2.0.5"
   resolved "https://registry.yarnpkg.com/foreach/-/foreach-2.0.5.tgz#0bee005018aeb260d0a3af3ae658dd0136ec1b99"
@@ -4735,6 +4740,13 @@ xterm-addon-web-links@^0.4.0:
   version "0.4.0"
   resolved "https://registry.npmjs.org/xterm-addon-web-links/-/xterm-addon-web-links-0.4.0.tgz"
   integrity sha512-xv8GeiINmx0zENO9hf5k+5bnkaE8mRzF+OBAr9WeFq2eLaQSudioQSiT34M1ofKbzcdjSsKiZm19Rw3i4eXamg==
+
+xterm-webfont@^2.0.0:
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/xterm-webfont/-/xterm-webfont-2.0.0.tgz#c4d730bd36121d193c1c9ea8744f529b368c0154"
+  integrity sha512-i0MMpWvpvl56VJDF34WPieTAgAM0dPVpTQ4odGFy3nlo8aQVnu5jdAfMf02eSqG03tBg0gdlY00PjGXDA/I2Yw==
+  dependencies:
+    fontfaceobserver "2.*"
 
 xterm@*, xterm@^4.15.0:
   version "4.15.0"

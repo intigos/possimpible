@@ -14,13 +14,12 @@ interface WorkerBucket{
     handler?: (message: IProcMessage, container: IContainer) => void;
 }
 const workers = new Map<string, WorkerBucket>();
-const DEBUG = false;
+const DEBUG = true;
 function init(kernel: Kernel){
     kernel.orchestrators.registerOrchestrator({
         name: "lorch",
         getcontainer: () => new Promise<IContainer>(resolve => {
             const id = UUID();
-            console.log(id);
             const wrk = new Worker(workerImage, {
                 name: "" + id
             });

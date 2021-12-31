@@ -3,7 +3,9 @@ export const FD_STDOUT = 1;
 export const FD_STDERR = 2;
 
 export enum OpenOptions{
-
+    READ,
+    WRITE,
+    APPEND
 }
 
 export type FileDescriptor = number
@@ -22,4 +24,6 @@ export interface ISystemCalls{
     exec: (path: string, argv: string[]) => Promise<number>
     chcwd: (path: string) => void;
     die: () => Promise<void>
+    mount: (fstype: string, device: string, options: string, mountpoint: string) => Promise<void>
+    unmount: (path: string) => Promise<void>
 }

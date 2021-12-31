@@ -4,5 +4,10 @@ declare module "libts" {
     export async function wait(pid: number): Promise<string>;
 
     export async function exit(code: number): Promise<void>;
-    export async function readline() : Promise<string>;
+
+    export async function readline(): Promise<string>;
+
+    export async function entrypoint(entrypoint: (argv: string[]) => Promise<number>);
+
+    export async function slurp(path: string): Promise<string>;
 }

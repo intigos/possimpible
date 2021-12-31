@@ -1,7 +1,7 @@
-import {FD_STDIN, FD_STDOUT} from "../../../public/api";
+import {FD_STDIN, FD_STDOUT, OpenOptions} from "../../../public/api";
 
 export function print(s: string){
-    self.proc.sys.write(FD_STDOUT, s);
+    self.proc.sys.write(FD_STDOUT, s.replaceAll("\n","\n\r"));
 }
 
 export async function wait(pid: number) {
@@ -32,4 +32,18 @@ export async function readline() : Promise<string>{
 
 export async function exit(code: number){
     await self.proc.sys.die();
+}
+
+export async function entrypoint(entrypoint: (argv: string[]) => Promise<number>){
+    setTimeout(async () => {
+        const exit = await entrypoint(self.proc.argv);
+        self.proc.sys.die();
+    }, 0)
+}
+
+export async function slurp(path: string): Promise<string>{
+    let fd = await self.proc.sys.open(path, OpenOptions.READ);
+    let content =  await self.proc.sys.read(fd, -1);
+    await self.proc.sys.close(fd);
+    return content
 }

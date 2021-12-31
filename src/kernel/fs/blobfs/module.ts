@@ -15,6 +15,7 @@ import {IDirectoryEntry} from "../../../public/api";
 import {IVFSMount} from "../mount";
 import {
     blob_add_to_parent,
+    blob_alloc_superblock,
     blob_data_alloc,
     blob_dirent_alloc,
     blob_get_data,
@@ -250,27 +251,6 @@ const fileOperations: IFileOperations = {
     }
 }
 
-
-
-async function mount(device: string): Promise<ISuperBlock>{
-    let txt = await(await (await fetch(device)).blob()).text();
-    let content = JSON.parse(txt) as IBlobSuperNode;
-
-    const entry = KERNEL.vfs.dcache.alloc(null, "");
-
-    const sb = {
-        root: entry,
-        device: content,
-        fileSystemType: fs,
-        superblockOperations:superBlockOperations,
-    }
-
-    entry.inode = inode_new(sb);
-    inode_set_ptr(entry.inode, content.nodes[0]);
-
-    return sb;
-}
-
 const superBlockOperations:ISuperBlockOperations = {
     alloc_inode(sb: ISuperBlock): IINode{
         return {
@@ -313,15 +293,63 @@ const superBlockOperations:ISuperBlockOperations = {
     }
 }
 
+async function mount(device: string, options: string): Promise<ISuperBlock>{
+    let txt = await(await (await fetch(device)).blob()).text();
+    let content = JSON.parse(txt) as IBlobSuperNode;
+
+    const entry = KERNEL.vfs.dcache.alloc(null, "");
+
+    const sb = {
+        root: entry,
+        device: content,
+        fileSystemType: fs,
+        superblockOperations:superBlockOperations,
+    }
+
+    entry.inode = inode_new(sb);
+    inode_set_ptr(entry.inode, content.nodes[0]);
+
+    return sb;
+}
+
 const fs: IFileSystemType = {
     name:"blob",
     mount: mount,
     unmount: (sb: ISuperBlock) => {}
 }
+
+async function mountramfs(device: string): Promise<ISuperBlock>{
+
+    const bsb = blob_alloc_superblock()
+    const inode = blob_inode_alloc(BlobINodeType.DIRECTORY, bsb, [])
+    bsb.nodes.push(inode)
+
+    const entry = KERNEL.vfs.dcache.alloc(null, "");
+
+    const sb = {
+        root: entry,
+        device: bsb,
+        fileSystemType: tmpfs,
+        superblockOperations:superBlockOperations,
+    }
+
+    entry.inode = inode_new(sb);
+    inode_set_ptr(entry.inode, bsb.nodes[0]);
+
+    return sb;
+}
+
+const tmpfs: IFileSystemType = {
+    name:"tmpfs",
+    mount: mountramfs,
+    unmount: (sb: ISuperBlock) => {}
+}
+
 let KERNEL;
 function init(kernel: Kernel){
     KERNEL = kernel;
     kernel.vfs.registerFS(fs);
+    kernel.vfs.registerFS(tmpfs);
 }
 
 function cleanup(){

@@ -177,7 +177,7 @@ const superblockOperations: ISuperBlockOperations ={
     }
 }
 
-async function mount(device: string): Promise<ISuperBlock>{
+async function mount(device: string, options:string): Promise<ISuperBlock>{
     let entry = KERNEL.vfs.dcache.alloc(null, "");
     const sb = {
         device: "dev",

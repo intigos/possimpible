@@ -1,10 +1,10 @@
 import {
     IProcChCwd,
     IProcClose, IProcDie, IProcExec, IProcExecRes, IProcGetCwd, IProcGetCwdRes, IProcGetDEnts, IProcGetDEntsRes,
-    IProcMessage, IProcOpen, IProcOpenRes,
+    IProcMessage, IProcMount, IProcOpen, IProcOpenRes,
     IProcRead,
     IProcReadRes,
-    IProcStart,
+    IProcStart, IProcUnmount,
     IProcWrite, IProcWriteRes,
     MessageID,
     MessageType,
@@ -23,7 +23,9 @@ export class Process{
         close: this.sys_close.bind(this),
         exec: this.sys_exec.bind(this),
         chcwd: this.sys_chcwd.bind(this),
-        die: this.sys_die.bind(this)
+        die: this.sys_die.bind(this),
+        mount: this.sys_mount.bind(this),
+        unmount: this.sys_unmount.bind(this),
     }
 
     private uuidv4() {
@@ -162,6 +164,31 @@ export class Process{
         const param: IProcDie = {
             type: MessageType.DIE,
             id: this.uuidv4(),
+        };
+
+        // wait to block
+        const res = await this.callWithPromise(param) as IProcExecRes;
+        return
+    }
+
+    private async sys_mount(fstype: string, device: string, options: string, mountpoint: string){
+        const param: IProcMount = {
+            device: device, fstype: fstype, options: options,
+            type: MessageType.MOUNT,
+            id: this.uuidv4(),
+            mountpoint: mountpoint
+        };
+
+        // wait to block
+        const res = await this.callWithPromise(param) as IProcExecRes;
+        return
+    }
+
+    private async sys_unmount(path:string){
+        const param: IProcUnmount = {
+            type: MessageType.UNMOUNT,
+            id: this.uuidv4(),
+            path: path,
         };
 
         // wait to block

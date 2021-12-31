@@ -3,17 +3,17 @@ import {v4 as UUID} from 'uuid';
 import {
     IDependency,
     IProcChCwd,
-    IProcChCwdRes,
+    IProcChCwdRes, IProcClose,
     IProcExec,
     IProcExecRes,
     IProcGetCwdRes,
     IProcGetDEnts,
     IProcGetDEntsRes,
-    IProcMessage,
+    IProcMessage, IProcMount, IProcMountRes,
     IProcOpen,
     IProcOpenRes,
     IProcRead,
-    IProcReadRes,
+    IProcReadRes, IProcUnmount, IProcUnmountRes,
     IProcWrite,
     MessageType
 } from "../../shared/proc";
@@ -28,17 +28,17 @@ interface ITaskOperations {
     getParent: (task: ITask) => NullableOr<ITask>
 }
 
-enum ITaskStatus{
+enum ITaskStatus {
     PENDING,
     RUNNGING,
     STOP
 }
 
-export interface ITaskFiles{
-    fileDescriptors: IFile[]
+export interface ITaskFiles {
+    fileDescriptors: (IFile | null)[]
 }
 
-export interface ITaskProcRefs{
+export interface ITaskProcRefs {
     dir: IProcFSEntry;
     fd: IProcFSEntry;
     fds: IProcFSEntry[];
@@ -47,7 +47,7 @@ export interface ITaskProcRefs{
     run: IProcFSEntry;
 }
 
-export interface ITask{
+export interface ITask {
     status: ITaskStatus,
     pid: number,
     uid: number,
@@ -62,13 +62,12 @@ export interface ITask{
 }
 
 
-
-export interface IProcess{
+export interface IProcess {
     container: IContainer,
     task: ITask
 }
 
-export class ProcessManagement{
+export class ProcessManagement {
     private lastId = 0;
     public pool: Map<pid, IProcess> = new Map<pid, IProcess>();
     public containers: Map<UUID, IProcess> = new Map<UUID, IProcess>();
@@ -82,15 +81,15 @@ export class ProcessManagement{
         getParent: this.getParent
     }
 
-    private genID(): number{
+    private genID(): number {
         this.lastId++;
         return this.lastId;
     }
 
-    getParent(task: ITask) : NullableOr<ITask>{
-        if (task.parent){
+    getParent(task: ITask): NullableOr<ITask> {
+        if (task.parent) {
             let c = this.pool.get(task.parent);
-            if(c){
+            if (c) {
                 return c.task;
             }
         }
@@ -102,24 +101,34 @@ export class ProcessManagement{
             case MessageType.WRITE: {
                 let write = message as IProcWrite;
                 const file = process.task.files.fileDescriptors[write.fd];
-                if(file.operations.write){
-                    file.operations.write(file, write.buf);
-                }else{
-                    // TODO: throw error
+                if (file) {
+                    if (file.operations.write) {
+                        file.operations.write(file, write.buf);
+                    } else {
+                        // TODO: throw error fs not suport write
+                    }
+                } else {
+                    // TODO: throw error fd does not exist
                 }
+
                 break;
             }
             case MessageType.READ: {
                 let read = message as IProcRead;
                 const file = process.task.files.fileDescriptors[read.fd];
-                let buf = await file.operations.read(file, read.count);
+                if (file) {
+                    let buf = await file.operations.read(file, read.count);
 
-                const res: IProcReadRes = {
-                    type: MessageType.READ_RES,
-                    id: message.id,
-                    buf
+                    const res: IProcReadRes = {
+                        type: MessageType.READ_RES,
+                        id: message.id,
+                        buf
+                    }
+                    container.operations.send(container, res)
+                } else {
+                    // TODO: throw up fd not eixst
                 }
-                container.operations.send(container, res)
+
                 break;
             }
             case MessageType.GETCWD: {
@@ -146,14 +155,55 @@ export class ProcessManagement{
                 container.operations.send(container, res)
                 break;
             }
+
+            case MessageType.CLOSE: {
+                let close = message as IProcClose;
+                process.task.files.fileDescriptors[close.fd] = null;
+                break;
+            }
+
+
             case MessageType.GETDENTS: {
                 let getdents = message as IProcGetDEnts;
                 const file = process.task.files.fileDescriptors[getdents.fd];
 
-                const res: IProcGetDEntsRes = {
-                    type: MessageType.GETDENTS_RES,
+                if (file) {
+                    const res: IProcGetDEntsRes = {
+                        type: MessageType.GETDENTS_RES,
+                        id: message.id,
+                        dirents: await file.operations.iterate(file)
+                    }
+                    container.operations.send(container, res)
+                } else {
+                    // TODO: throw up fd not exist
+                }
+
+                break;
+            }
+
+            case MessageType.MOUNT: {
+                let mount = message as IProcMount;
+                let cwd = process.task.pwd;
+                const mountpoint = this.kernel.vfs.lookup(cwd, mount.mountpoint)!;
+                await this.kernel.vfs.mount(mount.device, mount.options, mountpoint.mount, mountpoint.entry, this.kernel.vfs.getFS(mount.fstype));
+
+                const res: IProcMountRes = {
+                    type: MessageType.MOUNT_RES,
                     id: message.id,
-                    dirents: await file.operations.iterate(file)
+                }
+                container.operations.send(container, res)
+                break;
+            }
+
+            case MessageType.UNMOUNT: {
+                let unmount = message as IProcUnmount;
+                let cwd = process.task.pwd;
+                const mountpoint = this.kernel.vfs.lookup(cwd, unmount.path)!;
+                await this.kernel.vfs.unmount(mountpoint.mount!, mountpoint.entry);
+
+                const res: IProcUnmountRes = {
+                    type: MessageType.UNMOUNT_RES,
+                    id: message.id,
                 }
                 container.operations.send(container, res)
                 break;
@@ -191,17 +241,17 @@ export class ProcessManagement{
         }
     }
 
-    private async fetchDepCode(wd: IPath, dep:string): Promise<IDependency[]>{
+    private async fetchDepCode(wd: IPath, dep: string): Promise<IDependency[]> {
         let entry = this.kernel.vfs.lookup(wd, `/lib/${dep}.dyna`)!;
         let file = await this.kernel.vfs.open(entry);
         let content = await file.operations.read(file, -1);
         let result: IDependency[] = [];
-        if(!content.startsWith("dynalib:")){
+        if (!content.startsWith("dynalib:")) {
             // TODO
             console.log("Wrong format")
         }
         let dynalibstruct: IDynaLib = JSON.parse(content.substring(8))
-        for(let dep of dynalibstruct.dependencies){
+        for (let dep of dynalibstruct.dependencies) {
             result = result.concat(await this.fetchDepCode(wd, dep))
         }
         result.push({
@@ -211,11 +261,11 @@ export class ProcessManagement{
         return result;
     }
 
-    private openFile(task: ITask, pos:number, file: IFile){
+    private openFile(task: ITask, pos: number, file: IFile) {
         task.files.fileDescriptors[pos] = file;
         task.proc.fds[pos] = procCreate("" + pos, task.proc.fd, {
             write: async (f, buf) => {
-                if(file.operations.write){
+                if (file.operations.write) {
                     await file.operations.write(file, buf);
                 }
             },
@@ -224,18 +274,17 @@ export class ProcessManagement{
     }
 
 
-
-    async createProcess(path: string, argv:string[], wd:IPath, parent: ITask|undefined): Promise<ITask> {
+    async createProcess(path: string, argv: string[], wd: IPath, parent: ITask | undefined): Promise<ITask> {
         let entry = this.kernel.vfs.lookup(wd, path)!;
         let file = await this.kernel.vfs.open(entry);
         let content = await file.operations.read(file, -1);
-        if(!content.startsWith("PEXF:")){
+        if (!content.startsWith("PEXF:")) {
             // TODO
             console.log("Wrong format")
         }
-        let pexfstruct:IPEXF = JSON.parse(content.substring(5));
-        let dyna:IDependency[] = []
-        for(let dep of pexfstruct.dependencies){
+        let pexfstruct: IPEXF = JSON.parse(content.substring(5));
+        let dyna: IDependency[] = []
+        for (let dep of pexfstruct.dependencies) {
             dyna = dyna.concat(await this.fetchDepCode(wd, dep))
         }
         let pid = this.genID();
@@ -256,26 +305,29 @@ export class ProcessManagement{
                 fd: procMkdir("fd", p),
                 fds: [],
                 argv: procCreate("argv", p, {
-                    write: file1 => {},
+                    write: file1 => {
+                    },
                     read: (file1, count) => new Promise<string>(resolve => {
-                        resolve([path].concat(argv).reduce((x,y) => x + " " + y) + "\n")
+                        resolve([path].concat(argv).reduce((x, y) => x + " " + y) + "\n")
                     })
                 }),
                 orch: procCreate("orch", p, {
-                    write: file1 => {},
+                    write: file1 => {
+                    },
                     read: (file1, count) => new Promise<string>(resolve => {
-                        resolve("lorch:" + container.id+"\n");
+                        resolve("lorch:" + container.id + "\n");
                     })
                 }),
                 run: procCreate("run", p, {
-                    write: file1 => {},
+                    write: file1 => {
+                    },
                     read: (file1, count) => new Promise<string>((resolve, reject) => {
                         waits.push(resolve);
                     })
                 })
             },
             pwd: wd,
-            files: {fileDescriptors:[]},
+            files: {fileDescriptors: []},
             parent: parent ? parent.pid : undefined,
         };
 
@@ -295,6 +347,7 @@ export class ProcessManagement{
             container,
             task,
         }
+        console.log(path, container.id);
         this.pool.set(task.pid, process)
         this.containers.set(container.id, process);
         return task;
@@ -305,21 +358,21 @@ export class ProcessManagement{
         procRemove(process.task.proc.orch);
         procRemove(process.task.proc.argv);
         procRemove(process.task.proc.argv);
-        for(let i of process.task.proc.fds){
-            if(i){
+        for (let i of process.task.proc.fds) {
+            if (i) {
                 procRemove(i);
             }
         }
         procRemove(process.task.proc.fd);
         procRemove(process.task.proc.dir);
-        for(let release of process.task.waits){
-            release("");
+        for (let release of process.task.waits) {
+            release("CLOSE!");
         }
         this.pool.delete(process.task.pid);
         this.containers.delete(process.task.pid);
     }
 
-    wait(pid: pid): Promise<string>{
+    wait(pid: pid): Promise<string> {
         return new Promise<string>((resolve, reject) => {
             this.pool.get(pid)!.task.waits.push(resolve);
         })

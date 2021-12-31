@@ -1,5 +1,6 @@
 import {Terminal} from "xterm";
 import {FitAddon} from "xterm-addon-fit";
+import * as XtermWebfont from 'xterm-webfont'
 
 import {TTYDevice} from "./kernel/sys/devices";
 import {Kernel} from "./kernel/kernel";
@@ -16,11 +17,14 @@ class TerminalDevice extends TTYDevice{
     constructor(el: HTMLElement) {
         super();
         this.term = new Terminal({
-            fontSize:13
+            fontFamily: "JetBrains Mono",
+            fontSize:13,
+            rendererType: "dom"
         });
         const fitAddon = new FitAddon();
 
         this.term.loadAddon(fitAddon);
+        this.term.loadAddon(new XtermWebfont())
 
         this.term.onData((data) => {
             if(this.resolve && this.buffer.length == 0){
@@ -32,7 +36,8 @@ class TerminalDevice extends TTYDevice{
 
         })
         fitAddon.fit();
-        this.term.open(el);
+        // @ts-ignore
+        this.term.loadWebfontAndOpen(el);
     }
 
     async read(count: number): Promise<string> {

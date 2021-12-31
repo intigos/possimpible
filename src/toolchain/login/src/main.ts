@@ -1,10 +1,5 @@
-import {FD_STDIN, FD_STDOUT} from "../../../public/api";
+import {FD_STDIN, FD_STDOUT, OpenOptions} from "../../../public/api";
 import {print, readline, wait} from "libts";
-
-
-function update_utmp() {
-
-}
 
 setTimeout(async () => {
     let syscall = self.proc.sys;
@@ -15,7 +10,6 @@ setTimeout(async () => {
 
         self.proc.sys.write(FD_STDOUT, "\n\r");
         if (buf == "barney") {
-            update_utmp();
             const pid = await syscall.exec("/bin/psh", [""]);
 
             await wait(pid);

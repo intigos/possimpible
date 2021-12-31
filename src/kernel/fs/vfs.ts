@@ -6,7 +6,7 @@ import {IINode} from "./inode";
 
 export interface IFileSystemType{
     name: string;
-    mount: (device: string) => Promise<ISuperBlock>;
+    mount: (device: string, options:string) => Promise<ISuperBlock>;
     unmount: (sb: ISuperBlock) => void;
 }
 
@@ -238,13 +238,22 @@ export class VirtualFileSystem{
         this.dcache = new DirectoryCache(this.kernel);
     }
 
-    async mount(device: string, mount: IVFSMount|null, entry: IDEntry, filesystem:IFileSystemType): Promise<IVFSMount>{
-        let sb = await filesystem.mount(device);
+    async mount(device: string, options:string, mount: IVFSMount|null, entry: IDEntry, filesystem:IFileSystemType): Promise<IVFSMount>{
+        let sb = await filesystem.mount(device, options);
         let vfsmnt = this.mounts.create(mount, entry, sb);
 
         entry.superblock = sb;
         entry.mounted = true;
         return vfsmnt;
+    }
+
+    async unmount(mount: IVFSMount, entry: IDEntry): Promise<void>{
+        let sb = this.mounts.delete(mount!, entry)
+        sb.fileSystemType.unmount(sb);
+
+        entry.superblock = null;
+        entry.mounted = false;
+        return;
     }
 
     registerFS(fst: IFileSystemType){
