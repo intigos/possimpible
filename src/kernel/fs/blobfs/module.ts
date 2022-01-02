@@ -63,6 +63,11 @@ const inodeOperators: IINodeOperations = {
                 inode_set_ptr<IBlobINode>(inode, foundnode);
                 entry.inode = inode;
                 entry.superblock = inode.superblock;
+                return entry;
+            }else{
+                entry.inode = null;
+                entry.superblock = null;
+                return entry;
             }
         }else{
             // TODO: Throw erro

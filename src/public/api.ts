@@ -23,7 +23,9 @@ export interface ISystemCalls{
     close: (fd: FileDescriptor) => void,
     exec: (path: string, argv: string[]) => Promise<number>
     chcwd: (path: string) => void;
-    die: () => Promise<void>
+    die: (status: number) => Promise<void>
     mount: (fstype: string, device: string, options: string, mountpoint: string) => Promise<void>
     unmount: (path: string) => Promise<void>
+    mkdir: (path: string) => Promise<void>
+    rmdir: (path: string) => Promise<void>
 }

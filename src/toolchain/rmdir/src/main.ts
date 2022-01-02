@@ -1,5 +1,6 @@
 import {FD_STDIN, FD_STDOUT, OpenOptions} from "../../../public/api";
 import {print, readline, wait} from "libts";
+import {Status} from "../../../public/status";
 
 setTimeout(async () => {
     let syscall = self.proc.sys;
@@ -15,6 +16,6 @@ setTimeout(async () => {
             await wait(pid);
         }
 
-        await self.proc.sys.die(-1);
+        await self.proc.sys.die(Status.OK);
     }
 }, 0);

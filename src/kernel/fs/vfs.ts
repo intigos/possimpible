@@ -3,6 +3,7 @@ import {DirectoryCache, IDEntry} from "./dcache";
 import {IVFSMount, MountManager} from "./mount";
 import {IDirectoryEntry} from "../../public/api";
 import {IINode} from "./inode";
+import {PError, Status} from "../../public/status";
 
 export interface IFileSystemType{
     name: string;
@@ -264,9 +265,13 @@ export class VirtualFileSystem{
     }
 
     async open(path: IPath): Promise<IFile>{
-        const file = await path.entry.inode!.fileOperations.open(path.entry.inode!, path.entry);
-        file.dentry = path.entry;
-        return file;
+        if(path.entry.inode){
+            const file = await path.entry.inode!.fileOperations.open(path.entry.inode!, path.entry);
+            file.dentry = path.entry;
+            return file;
+        }else{
+            throw new PError(Status.ENOENT);
+        }
     }
 
     path(path: IPath): string{
@@ -316,8 +321,8 @@ export class VirtualFileSystem{
                 if(!child || (child!.operations?.revalidate && child.operations?.revalidate(child))){
                     child = this.dcache.alloc(pivot.entry, component);
                     let other = pivot.entry?.inode!.operations.lookup(pivot.entry?.inode!, child);
-                    if(other){
-                        // ??
+                    if(other?.inode){
+
                     }
                 }
 

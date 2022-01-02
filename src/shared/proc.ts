@@ -1,4 +1,5 @@
 import {FileDescriptor, IDirectoryEntry, OpenOptions} from "../public/api";
+import {Status} from "../public/status";
 
 export type MessageID = string
 
@@ -16,6 +17,9 @@ export enum MessageType{
     DIE,
     MOUNT,
     UNMOUNT,
+    MKDIR,
+    RMDIR,
+
 
     READ_RES,
     WRITE_RES,
@@ -25,7 +29,10 @@ export enum MessageType{
     EXEC_RES,
     CHCWD_RES,
     MOUNT_RES,
-    UNMOUNT_RES
+    UNMOUNT_RES,
+    MKDIR_RES,
+    RMDIR_RES,
+    ERROR,
 }
 
 export interface IProcMessage{
@@ -126,6 +133,7 @@ export interface IProcChCwdRes extends IProcMessage{
 
 export interface IProcDie extends IProcMessage{
     type: MessageType.DIE
+    status: Status
 }
 
 export interface IProcMount extends IProcMessage{
@@ -147,4 +155,27 @@ export interface IProcUnmount extends IProcMessage{
 
 export interface IProcUnmountRes extends IProcMessage{
     type: MessageType.UNMOUNT_RES,
+}
+
+export interface IProcMkdir extends IProcMessage{
+    type: MessageType.MKDIR,
+    path: string
+}
+
+export interface IProcMkdirRes extends IProcMessage{
+    type: MessageType.MKDIR_RES
+}
+
+export interface IProcRmdir extends IProcMessage{
+    type: MessageType.RMDIR,
+    path: string
+}
+
+export interface IProcRmdirRes extends IProcMessage{
+    type: MessageType.RMDIR_RES
+}
+
+export interface IProcError extends IProcMessage{
+    type: MessageType.ERROR,
+    code: Status
 }

@@ -1,4 +1,5 @@
 import {FD_STDIN, FD_STDOUT, OpenOptions} from "../../../public/api";
+import {PError, Status} from "../../../public/status";
 
 export function print(s: string){
     self.proc.sys.write(FD_STDOUT, s.replaceAll("\n","\n\r"));
@@ -30,14 +31,23 @@ export async function readline() : Promise<string>{
     }
 }
 
-export async function exit(code: number){
-    await self.proc.sys.die();
+export async function exit(code: Status){
+    await self.proc.sys.die(code);
 }
 
 export async function entrypoint(entrypoint: (argv: string[]) => Promise<number>){
     setTimeout(async () => {
-        const exit = await entrypoint(self.proc.argv);
-        self.proc.sys.die();
+        try{
+            const exit = await entrypoint(self.proc.argv);
+        }catch (e) {
+            if (e instanceof PError){
+                self.proc.sys.die(e.code);
+            }else{
+                self.proc.sys.die(-1);
+            }
+        }finally {
+            self.proc.sys.die(0);
+        }
     }, 0)
 }
 

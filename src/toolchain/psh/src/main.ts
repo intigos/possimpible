@@ -1,6 +1,7 @@
 import {FD_STDIN, FD_STDOUT} from "../../../public/api";
 import stringToArgv from "string-to-argv";
 import {wait, exit as die, print} from "libts";
+import {PError, Status} from "../../../public/status";
 
 let syscall = self.proc.sys;
 
@@ -45,8 +46,21 @@ setTimeout(async () => {
                 if(!cmd.startsWith("/")){
                     cmd = "/bin/" + cmd;
                 }
-                let pid = await syscall.exec(cmd, argv.slice(1));
-                await wait(pid)
+                try{
+                    let pid = await syscall.exec(cmd, argv.slice(1));
+                    await wait(pid)
+                }catch (e) {
+                    let msg;
+                    const code =(e as PError).code;
+                    switch(code){
+                        case Status.ENOENT:
+                            msg = cmd + ": command not found"
+                            break
+                        default:
+                            msg = cmd + ": unkown error " + code;
+                    }
+                    print("psh: " + msg + "\n");
+                }
             }
             buf = "";
             cwd = await syscall.getcwd();

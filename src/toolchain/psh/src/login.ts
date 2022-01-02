@@ -1,6 +1,0 @@
-
-function getlogin(): string{
-
-
-    return ""
-}

@@ -1,15 +1,30 @@
 import {
     IProcChCwd,
-    IProcClose, IProcDie, IProcExec, IProcExecRes, IProcGetCwd, IProcGetCwdRes, IProcGetDEnts, IProcGetDEntsRes,
-    IProcMessage, IProcMount, IProcOpen, IProcOpenRes,
+    IProcClose,
+    IProcDie, IProcError,
+    IProcExec,
+    IProcExecRes,
+    IProcGetCwd,
+    IProcGetCwdRes,
+    IProcGetDEnts,
+    IProcGetDEntsRes,
+    IProcMessage,
+    IProcMkdir,
+    IProcMount,
+    IProcOpen,
+    IProcOpenRes,
     IProcRead,
     IProcReadRes,
-    IProcStart, IProcUnmount,
-    IProcWrite, IProcWriteRes,
+    IProcRmdir,
+    IProcStart,
+    IProcUnmount,
+    IProcWrite,
+    IProcWriteRes,
     MessageID,
     MessageType,
 } from "../shared/proc";
 import {FileDescriptor, IDirectoryEntry, ISystemCalls, OpenOptions} from "../public/api";
+import {PError, Status} from "../public/status";
 
 export class Process{
     private router = new Map<MessageID, (message: IProcMessage) => void>();
@@ -26,6 +41,8 @@ export class Process{
         die: this.sys_die.bind(this),
         mount: this.sys_mount.bind(this),
         unmount: this.sys_unmount.bind(this),
+        mkdir: this.sys_mkdir.bind(this),
+        rmdir: this.sys_rmdir.bind(this),
     }
 
     private uuidv4() {
@@ -65,7 +82,13 @@ export class Process{
     private callWithPromise(message: IProcMessage) : Promise<IProcMessage>{
         return new Promise<IProcMessage>((resolve, reject) => {
             this.router.set(message.id, response => {
-                resolve(response);
+                this.router.delete(message.id);
+                if (response.type != MessageType.ERROR){
+                    resolve(response);
+                }else{
+                    let res = response as IProcError
+                    reject(new PError(res.code))
+                }
             });
             self.postMessage(message);
         })
@@ -160,10 +183,11 @@ export class Process{
         return
     }
 
-    private async sys_die(){
+    private async sys_die(number: Status){
         const param: IProcDie = {
             type: MessageType.DIE,
             id: this.uuidv4(),
+            status: number
         };
 
         // wait to block
@@ -187,6 +211,30 @@ export class Process{
     private async sys_unmount(path:string){
         const param: IProcUnmount = {
             type: MessageType.UNMOUNT,
+            id: this.uuidv4(),
+            path: path,
+        };
+
+        // wait to block
+        const res = await this.callWithPromise(param) as IProcExecRes;
+        return
+    }
+
+    private async sys_mkdir(path:string){
+        const param: IProcMkdir = {
+            type: MessageType.MKDIR,
+            id: this.uuidv4(),
+            path: path,
+        };
+
+        // wait to block
+        const res = await this.callWithPromise(param) as IProcExecRes;
+        return
+    }
+
+    private async sys_rmdir(path:string){
+        const param: IProcRmdir = {
+            type: MessageType.RMDIR,
             id: this.uuidv4(),
             path: path,
         };

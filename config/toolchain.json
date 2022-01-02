@@ -8,6 +8,8 @@
     "login",
     "psh",
     "mount",
-    "umount"
+    "umount",
+    "mkdir",
+    "rmdir"
   ]
 }

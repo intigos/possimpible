@@ -3,17 +3,24 @@ import {v4 as UUID} from 'uuid';
 import {
     IDependency,
     IProcChCwd,
-    IProcChCwdRes, IProcClose,
+    IProcChCwdRes,
+    IProcClose,
+    IProcError,
     IProcExec,
     IProcExecRes,
     IProcGetCwdRes,
     IProcGetDEnts,
     IProcGetDEntsRes,
-    IProcMessage, IProcMount, IProcMountRes,
+    IProcMessage,
+    IProcMkdir,
+    IProcMount,
+    IProcMountRes,
     IProcOpen,
     IProcOpenRes,
     IProcRead,
-    IProcReadRes, IProcUnmount, IProcUnmountRes,
+    IProcReadRes,
+    IProcUnmount,
+    IProcUnmountRes,
     IProcWrite,
     MessageType
 } from "../../shared/proc";
@@ -21,6 +28,7 @@ import {IContainer} from "./orchestrator";
 import {IFile, IPath} from "../fs/vfs";
 import {IDynaLib, IPEXF} from "../../shared/pexf";
 import {IProcFSEntry, procCreate, procMkdir, procRemove} from "../fs/procfs/module";
+import {PError, Status} from "../../public/status";
 
 type pid = number;
 
@@ -97,146 +105,177 @@ export class ProcessManagement {
 
     async handleProcess(message: IProcMessage, container: IContainer) {
         const process = this.containers.get(container.id)!;
-        switch (message.type) {
-            case MessageType.WRITE: {
-                let write = message as IProcWrite;
-                const file = process.task.files.fileDescriptors[write.fd];
-                if (file) {
-                    if (file.operations.write) {
-                        file.operations.write(file, write.buf);
+        try{
+            switch (message.type) {
+                case MessageType.WRITE: {
+                    let write = message as IProcWrite;
+                    const file = process.task.files.fileDescriptors[write.fd];
+                    if (file) {
+                        if (file.operations.write) {
+                            file.operations.write(file, write.buf);
+                        } else {
+                            throw new PError(Status.EPERM);
+                        }
                     } else {
-                        // TODO: throw error fs not suport write
+                        throw new PError(Status.EBADFD);
                     }
-                } else {
-                    // TODO: throw error fd does not exist
+                    break;
                 }
+                case MessageType.READ: {
+                    let read = message as IProcRead;
+                    const file = process.task.files.fileDescriptors[read.fd];
+                    if (file) {
+                        let buf = await file.operations.read(file, read.count);
 
-                break;
-            }
-            case MessageType.READ: {
-                let read = message as IProcRead;
-                const file = process.task.files.fileDescriptors[read.fd];
-                if (file) {
-                    let buf = await file.operations.read(file, read.count);
-
-                    const res: IProcReadRes = {
-                        type: MessageType.READ_RES,
+                        const res: IProcReadRes = {
+                            type: MessageType.READ_RES,
+                            id: message.id,
+                            buf
+                        }
+                        container.operations.send(container, res)
+                    } else {
+                        throw new PError(Status.EBADFD);
+                    }
+                    break;
+                }
+                case MessageType.GETCWD: {
+                    const res: IProcGetCwdRes = {
+                        type: MessageType.GETCWD_RES,
                         id: message.id,
-                        buf
+                        cwd: this.kernel.vfs.path(process.task.pwd)
                     }
                     container.operations.send(container, res)
-                } else {
-                    // TODO: throw up fd not eixst
+                    break;
                 }
 
-                break;
-            }
-            case MessageType.GETCWD: {
-                const res: IProcGetCwdRes = {
-                    type: MessageType.GETCWD_RES,
-                    id: message.id,
-                    cwd: this.kernel.vfs.path(process.task.pwd)
-                }
-                container.operations.send(container, res)
-                break;
-            }
-            case MessageType.OPEN: {
-                let open = message as IProcOpen;
-                let cwd = process.task.pwd;
-                let entry = this.kernel.vfs.lookup(cwd, open.path)!;
-                let file = await this.kernel.vfs.open(entry);
+                case MessageType.OPEN: {
+                    let open = message as IProcOpen;
+                    let cwd = process.task.pwd;
+                    let entry = this.kernel.vfs.lookup(cwd, open.path)!;
+                    let file = await this.kernel.vfs.open(entry);
 
-                let fd = process.task.files.fileDescriptors.push(file) - 1;
-                const res: IProcOpenRes = {
-                    type: MessageType.OPEN_RES,
-                    id: message.id,
-                    fd
-                }
-                container.operations.send(container, res)
-                break;
-            }
-
-            case MessageType.CLOSE: {
-                let close = message as IProcClose;
-                process.task.files.fileDescriptors[close.fd] = null;
-                break;
-            }
-
-
-            case MessageType.GETDENTS: {
-                let getdents = message as IProcGetDEnts;
-                const file = process.task.files.fileDescriptors[getdents.fd];
-
-                if (file) {
-                    const res: IProcGetDEntsRes = {
-                        type: MessageType.GETDENTS_RES,
+                    let fd = process.task.files.fileDescriptors.push(file) - 1;
+                    const res: IProcOpenRes = {
+                        type: MessageType.OPEN_RES,
                         id: message.id,
-                        dirents: await file.operations.iterate(file)
+                        fd
                     }
                     container.operations.send(container, res)
-                } else {
-                    // TODO: throw up fd not exist
+                    break;
                 }
 
-                break;
+                case MessageType.CLOSE: {
+                    let close = message as IProcClose;
+                    if(!process.task.files.fileDescriptors){
+                        throw new PError(Status.EBADFD);
+                    }
+                    process.task.files.fileDescriptors[close.fd] = null;
+                    break;
+                }
+
+
+                case MessageType.GETDENTS: {
+                    let getdents = message as IProcGetDEnts;
+                    const file = process.task.files.fileDescriptors[getdents.fd];
+
+                    if (file) {
+                        const res: IProcGetDEntsRes = {
+                            type: MessageType.GETDENTS_RES,
+                            id: message.id,
+                            dirents: await file.operations.iterate(file)
+                        }
+                        container.operations.send(container, res)
+                    } else {
+                        throw new PError(Status.EBADFD);
+                    }
+
+                    break;
+                }
+
+                case MessageType.MOUNT: {
+                    let mount = message as IProcMount;
+                    let cwd = process.task.pwd;
+                    const mountpoint = this.kernel.vfs.lookup(cwd, mount.mountpoint)!;
+                    await this.kernel.vfs.mount(mount.device, mount.options, mountpoint.mount, mountpoint.entry, this.kernel.vfs.getFS(mount.fstype));
+
+                    const res: IProcMountRes = {
+                        type: MessageType.MOUNT_RES,
+                        id: message.id,
+                    }
+                    container.operations.send(container, res)
+                    break;
+                }
+
+                case MessageType.UNMOUNT: {
+                    let unmount = message as IProcUnmount;
+                    let cwd = process.task.pwd;
+                    const mountpoint = this.kernel.vfs.lookup(cwd, unmount.path)!;
+                    await this.kernel.vfs.unmount(mountpoint.mount!, mountpoint.entry);
+
+                    const res: IProcUnmountRes = {
+                        type: MessageType.UNMOUNT_RES,
+                        id: message.id,
+                    }
+                    container.operations.send(container, res)
+                    break;
+                }
+
+                case MessageType.EXEC: {
+                    let exec = message as IProcExec;
+                    let task = await this.createProcess(exec.path, exec.argv, process.task.pwd, process.task);
+
+                    const res: IProcExecRes = {
+                        type: MessageType.EXEC_RES,
+                        id: message.id,
+                        pid: task.pid
+                    }
+                    container.operations.send(container, res)
+                    break;
+                }
+
+                case MessageType.CHCWD: {
+                    let chcwd = message as IProcChCwd;
+                    let task = process.task;
+
+                    task.pwd = this.kernel.vfs.lookup(task.pwd, chcwd.path)!;
+                    const res: IProcChCwdRes = {
+                        type: MessageType.CHCWD_RES,
+                        id: message.id
+                    }
+                    container.operations.send(container, res)
+                    break;
+                }
+
+                case MessageType.DIE: {
+                    this.kernel.processes.killProcess(process);
+                    break;
+                }
+
+                case MessageType.MKDIR: {
+                    let mkdir = message as IProcMkdir;
+                    let task = process.task;
+
+                    let cwd = process.task.pwd;
+                    let path = this.kernel.vfs.lookup(cwd, mkdir.path)!;
+                    if (path.entry.inode != null){
+                        throw "Already exists";
+                    }
+
+                    let entry = path.entry;
+                    debugger;
+
+
+                    break;
+                }
             }
-
-            case MessageType.MOUNT: {
-                let mount = message as IProcMount;
-                let cwd = process.task.pwd;
-                const mountpoint = this.kernel.vfs.lookup(cwd, mount.mountpoint)!;
-                await this.kernel.vfs.mount(mount.device, mount.options, mountpoint.mount, mountpoint.entry, this.kernel.vfs.getFS(mount.fstype));
-
-                const res: IProcMountRes = {
-                    type: MessageType.MOUNT_RES,
+        }catch (e) {
+            if(e instanceof PError){
+                const error: IProcError = {
+                    type: MessageType.ERROR,
                     id: message.id,
+                    code: e.code,
                 }
-                container.operations.send(container, res)
-                break;
-            }
-
-            case MessageType.UNMOUNT: {
-                let unmount = message as IProcUnmount;
-                let cwd = process.task.pwd;
-                const mountpoint = this.kernel.vfs.lookup(cwd, unmount.path)!;
-                await this.kernel.vfs.unmount(mountpoint.mount!, mountpoint.entry);
-
-                const res: IProcUnmountRes = {
-                    type: MessageType.UNMOUNT_RES,
-                    id: message.id,
-                }
-                container.operations.send(container, res)
-                break;
-            }
-
-            case MessageType.EXEC: {
-                let exec = message as IProcExec;
-                let task = await this.createProcess(exec.path, exec.argv, process.task.pwd, process.task);
-
-                const res: IProcExecRes = {
-                    type: MessageType.EXEC_RES,
-                    id: message.id,
-                    pid: task.pid
-                }
-                container.operations.send(container, res)
-                break;
-            }
-
-            case MessageType.CHCWD: {
-                let chcwd = message as IProcChCwd;
-                let task = process.task;
-
-                task.pwd = this.kernel.vfs.lookup(task.pwd, chcwd.path)!;
-                const res: IProcChCwdRes = {
-                    type: MessageType.CHCWD_RES,
-                    id: message.id
-                }
-                container.operations.send(container, res)
-                break;
-            }
-
-            case MessageType.DIE: {
-                this.kernel.processes.killProcess(process);
+                container.operations.send(container, error);
             }
         }
     }
@@ -279,8 +318,7 @@ export class ProcessManagement {
         let file = await this.kernel.vfs.open(entry);
         let content = await file.operations.read(file, -1);
         if (!content.startsWith("PEXF:")) {
-            // TODO
-            console.log("Wrong format")
+            throw new PError(Status.ENOEXEC);
         }
         let pexfstruct: IPEXF = JSON.parse(content.substring(5));
         let dyna: IDependency[] = []
