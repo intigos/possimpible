@@ -1,3 +1,5 @@
+import {IDeviceTree} from "../../vm/devicetree";
+
 export interface IDevice{
     write(str: String);
     read(count: number): Promise<string>;
@@ -15,4 +17,13 @@ export class NullDevice extends TTYDevice{
     }
 
     write(str: String) {}
+}
+
+
+export class DeviceManager {
+    private devicetree: IDeviceTree;
+
+    constructor(devicetree: IDeviceTree) {
+        this.devicetree = devicetree;
+    }
 }

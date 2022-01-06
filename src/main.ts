@@ -4,10 +4,12 @@ import * as XtermWebfont from 'xterm-webfont'
 
 import {TTYDevice} from "./kernel/sys/devices";
 import {Kernel} from "./kernel/kernel";
-import "xterm/css/xterm.css"
+import "xterm/css/xterm.css";
 
 // @ts-ignore
 import initrd from "&/initrd.img";
+import {VirtualMachine} from "./vm/vm";
+import {discover, DSDisplay, DSKeyboard, DSNode, DSProperty, DSStorage, IDeviceTree} from "./vm/devicetree";
 
 class TerminalDevice extends TTYDevice{
     private term: Terminal;
@@ -56,11 +58,70 @@ class TerminalDevice extends TTYDevice{
     }
 }
 
+
+const terminal = new TerminalDevice(document.getElementById("term")!);
+
+class BlobStorage extends DSStorage{
+    private image: any;
+
+    constructor(image: any) {
+        super();
+        this.image = image;
+    }
+
+    attach(): IDeviceTree[] {
+        return [
+            DSProperty("read", (count: number) => terminal.read(count)),
+            DSProperty("write", () => 1)
+        ];
+    }
+}
+
+class DebugScreen extends DSDisplay{
+    constructor() {
+        super();
+    }
+
+    attach(): IDeviceTree[] {
+        return [
+            DSProperty("write", (buf: string) => terminal.write(buf))
+        ];
+    }
+}
+
+class Keyboard extends DSKeyboard{
+    constructor() {
+        super();
+    }
+
+    attach(): IDeviceTree[] {
+        return [
+            DSProperty("read", (count: number) => terminal.read(count))
+        ];
+    }
+}
+
 window.onload = async () => setTimeout(async x => {
-    const kernel = new Kernel({
-        tty: new TerminalDevice(document.getElementById("term")!),
-        initrd: initrd,
+    const vm = new VirtualMachine(discover([
+        DSNode("storage", [
+            DSNode("initrd0", new BlobStorage(initrd).attach())
+        ]),
+
+        DSNode("display", [
+            DSNode("serial", new DebugScreen().attach()),
+            DSNode("console", [
+                DSProperty("write", (buf: string) => console.log(buf))
+            ])
+        ]),
+
+        DSNode("input", [
+            DSNode("keyboard0", new Keyboard().attach())
+        ]),
+    ]));
+
+    await vm.boot(new Kernel({
+        console: "/dev/tty0",
+        root: "/dev/initrd0",
         initrc: "/bin/init"
-    });
-    await kernel.boot()
+    }));
 }, 100);

@@ -9,6 +9,7 @@ export class VirtualMachine{
     }
 
     async boot(kernel: Kernel){
-        return await kernel.boot()
+        return await kernel.boot(this.devicetree);
     }
 }
+

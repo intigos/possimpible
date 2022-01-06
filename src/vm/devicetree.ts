@@ -1,3 +1,5 @@
+import uaparser from 'ua-parser-js'
+
 export interface IDeviceTree {
     id: string;
     label?: string;
@@ -5,24 +7,53 @@ export interface IDeviceTree {
     children?: IDeviceTree[];
 }
 
-export function DSNode(id: string, label: string|IDeviceTree[], children?: IDeviceTree[]): IDeviceTree{
-    if(children){
+export function DSNode(id: string, label: string | IDeviceTree[], children?: IDeviceTree[]): IDeviceTree {
+    if (children) {
         return {
-            id:id,
+            id: id,
             label: id,
-            children:children,
+            children: children,
         }
-    }else{
+    } else {
         return {
-            id:id,
-            children:label as IDeviceTree[],
+            id: id,
+            children: label as IDeviceTree[],
         }
     }
 }
 
-export function DSProperty(id: string, value: any): IDeviceTree{
+export function DSProperty(id: string, value: any): IDeviceTree {
     return {
-        id:id,
-        value:value,
+        id: id,
+        value: value,
     }
 }
+
+export interface DSDevice {
+    attach(): IDeviceTree[];
+}
+
+export abstract class DSDisplay implements DSDevice {
+    abstract attach(): IDeviceTree[];
+
+}
+
+export abstract class DSStorage implements DSDevice {
+    abstract attach(): IDeviceTree[];
+
+}
+
+export abstract class DSKeyboard implements DSDevice {
+    abstract attach(): IDeviceTree[];
+
+}
+
+export function discover(attach: IDeviceTree[]) {
+    const data = uaparser()
+    return DSNode("/", [
+        DSNode((data.browser.name || "unknown") + ","+data.browser.version, ([
+            // autodiscover features
+        ] as IDeviceTree[]).concat(attach)),
+    ]);
+}
+

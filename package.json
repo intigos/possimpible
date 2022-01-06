@@ -25,11 +25,13 @@
     "types-webpack-bundler": "^1.0.2",
     "xterm": "^4.15.0",
     "xterm-addon-fit": "^0.5.0",
-    "xterm-addon-web-links": "^0.4.0"
+    "xterm-addon-web-links": "^0.4.0",
+    "ua-parser-js": "1.0.2"
   },
   "devDependencies": {
     "@types/argparse": "^2.0.10",
     "@types/node": "^17.0.4",
+    "@types/ua-parser-js": "^0.7.36",
     "argparse": "^2.0.1",
     "browserify": "^17.0.0",
     "case-sensitive-paths-webpack-plugin": "^2.4.0",

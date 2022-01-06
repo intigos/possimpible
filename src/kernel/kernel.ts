@@ -10,24 +10,19 @@ import {OrchestratorManagement} from "./proc/orchestrator";
 import {NamespaceManager, NSOperation} from "./ns/namespace";
 import {PError, Status} from "../public/status";
 import {Lookup} from "./fs/namei";
+import {IDeviceTree} from "../vm/devicetree";
 
-interface IKernelOptions {
-    root: any;
-    initrd: any;
-    initrc: any;
-    tty: TTYDevice
-}
+type IKernelOptions = Record<string, string>;
 
 export class Kernel{
     public vfs: VirtualFileSystem;
     public modules: ModularityManager;
-    public tty: TTYDevice;
-    public toptask?: ITask;
     public processes: ProcessManagement;
     public orchestrators: OrchestratorManagement;
     private options: Partial<IKernelOptions>;
     private namespaces: NamespaceManager;
     public current?: ITask;
+    private devicetree?: IDeviceTree;
 
     constructor(options: Partial<IKernelOptions>){
         this.options = options;
@@ -53,7 +48,8 @@ export class Kernel{
         return prototask;
     }
     
-    async boot(){
+    async boot(deviceTree:IDeviceTree){
+        this.devicetree = deviceTree;
         this.printk("Booting Kernel...");
         this.modules.installModule(blobfs);
         this.modules.installModule(devfs);
@@ -82,6 +78,7 @@ export class Kernel{
         await this.vfs.mount("", "", dev.mount, dev.entry, this.vfs.getFS("dev"));
 
         const proc = this.vfs.lookup("/proc", ktask)!;
+
         await this.vfs.mount("", "", proc.mount, proc.entry, this.vfs.getFS("proc"));
 
         const run = this.vfs.lookup("/var/tmp", ktask)!;
@@ -101,8 +98,8 @@ export class Kernel{
     }
 
     printk(data: string){
-        this.tty.write(data);
-        this.tty.write("\n\r");
+        // this.tty.write(data);
+        // this.tty.write("\n\r");
     }
 
     panic(data: string){
