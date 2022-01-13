@@ -4,6 +4,8 @@ import {IVFSMount, MountManager} from "./mount";
 import {IDirectoryEntry} from "../../public/api";
 import {IINode} from "./inode";
 import {PError, Status} from "../../public/status";
+import {NameI} from "./namei";
+import {IProtoTask, ITask} from "../proc/process";
 
 export interface IFileSystemType{
     name: string;
@@ -232,11 +234,13 @@ export class VirtualFileSystem{
     private kernel: Kernel;
     public mounts: MountManager;
     public dcache: DirectoryCache;
+    private namei: NameI;
 
     constructor(kernel: Kernel) {
         this.kernel = kernel;
         this.mounts = new MountManager(this.kernel);
         this.dcache = new DirectoryCache(this.kernel);
+        this.namei = new NameI(this.kernel);
     }
 
     async mount(device: string, options:string, mount: IVFSMount|null, entry: IDEntry, filesystem:IFileSystemType): Promise<IVFSMount>{
@@ -244,7 +248,7 @@ export class VirtualFileSystem{
         let vfsmnt = this.mounts.create(mount, entry, sb);
 
         entry.superblock = sb;
-        entry.mounted = true;
+        entry.mounted++;
         return vfsmnt;
     }
 
@@ -253,7 +257,7 @@ export class VirtualFileSystem{
         sb.fileSystemType.unmount(sb);
 
         entry.superblock = null;
-        entry.mounted = false;
+        entry.mounted--;
         return;
     }
 
@@ -304,42 +308,47 @@ export class VirtualFileSystem{
         return {mount:mount, entry:entry};
     }
 
-    lookup(cwd: IPath|null, path: string): IPath{
-        const seg = splitInSegments(path);
-        if (cwd){
-            let pivot: IPath;
-            let component: string;
-            if(path.startsWith("/")){
-                component = seg.shift()!;
-                pivot = this.findRoot(cwd);
-            }else{
-                pivot = {entry:cwd.entry, mount:cwd.mount};
-            }
-            while(seg.length){
-                component = seg.shift()!;
-                let child = this.dcache.lookup(pivot.entry, component);
-                if(!child || (child!.operations?.revalidate && child.operations?.revalidate(child))){
-                    child = this.dcache.alloc(pivot.entry, component);
-                    let other = pivot.entry?.inode!.operations.lookup(pivot.entry?.inode!, child);
-                    if(other?.inode){
-
-                    }
-                }
-
-                if(child.mounted){
-                    pivot.mount = this.mounts.lookupChild(pivot.mount!, child)!;
-                    pivot.entry = pivot.mount.root;
-                }else{
-                    pivot.entry = child;
-                }
-            }
-            return pivot;
+    lookup(path: string, task: IProtoTask|null): IPath{
+        // const seg = splitInSegments(path);
+        // if (cwd){
+        //     let pivot: IPath;
+        //     let component: string;
+        //     if(path.startsWith("/")){
+        //         component = seg.shift()!;
+        //         pivot = this.findRoot(cwd);
+        //     }else{
+        //         pivot = {entry:cwd.entry, mount:cwd.mount};
+        //     }
+        //     while(seg.length){
+        //         component = seg.shift()!;
+        //         let child = this.dcache.lookup(pivot.entry, component);
+        //         if(!child || (child!.operations?.revalidate && child.operations?.revalidate(child))){
+        //             child = this.dcache.alloc(pivot.entry, component);
+        //             let other = pivot.entry?.inode!.operations.lookup(pivot.entry?.inode!, child);
+        //             if(other?.inode){
+        //
+        //             }
+        //         }
+        //
+        //         if(child.mounted){
+        //             pivot.mount = this.mounts.lookupChild(pivot.mount!, child)!;
+        //             pivot.entry = pivot.mount.root;
+        //         }else{
+        //             pivot.entry = child;
+        //         }
+        //     }
+        //     return pivot;
+        // }else{
+        //     let entry = this.dcache.alloc(null, '');
+        //     return { mount: null, entry: entry }
+        // }
+        if (task){
+            const nd = this.namei.pathLookup(path, 0, task);
+            return nd.path;
         }else{
             let entry = this.dcache.alloc(null, '');
             return { mount: null, entry: entry }
         }
-
-
     }
 }
 

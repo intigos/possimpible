@@ -28,6 +28,7 @@ import {
     IBlobSuperNode
 } from "./structs";
 import {IINode, IINodeOperations, inode_get_ptr, inode_new, inode_set_ptr} from "../inode";
+import {PError, Status} from "../../../public/status";
 
 const inodeOperators: IINodeOperations = {
     create:(dir, dentry, create) => {
@@ -70,7 +71,7 @@ const inodeOperators: IINodeOperations = {
                 return entry;
             }
         }else{
-            // TODO: Throw erro
+            throw new PError(Status.ENOTDIR);
         }
         return null;
     },

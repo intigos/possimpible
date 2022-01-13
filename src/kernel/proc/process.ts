@@ -55,6 +55,14 @@ export interface ITaskProcRefs {
     run: IProcFSEntry;
 }
 
+export interface IProtoTask{
+    pid?: number,
+    uid?: number,
+    gid?: number,
+    root: IPath;
+    pwd: IPath;
+}
+
 export interface ITask {
     status: ITaskStatus,
     pid: number,
@@ -63,6 +71,7 @@ export interface ITask {
     sys: any,
     proc: ITaskProcRefs,
     pwd: IPath;
+    root: IPath;
     waits: ((value: (string | PromiseLike<string>)) => void)[];
     files: ITaskFiles
     parent?: pid
@@ -151,7 +160,7 @@ export class ProcessManagement {
                 case MessageType.OPEN: {
                     let open = message as IProcOpen;
                     let cwd = process.task.pwd;
-                    let entry = this.kernel.vfs.lookup(cwd, open.path)!;
+                    let entry = this.kernel.vfs.lookup(open.path, process.task)!;
                     let file = await this.kernel.vfs.open(entry);
 
                     let fd = process.task.files.fileDescriptors.push(file) - 1;
@@ -195,7 +204,7 @@ export class ProcessManagement {
                 case MessageType.MOUNT: {
                     let mount = message as IProcMount;
                     let cwd = process.task.pwd;
-                    const mountpoint = this.kernel.vfs.lookup(cwd, mount.mountpoint)!;
+                    const mountpoint = this.kernel.vfs.lookup(mount.mountpoint, process.task)!;
                     await this.kernel.vfs.mount(mount.device, mount.options, mountpoint.mount, mountpoint.entry, this.kernel.vfs.getFS(mount.fstype));
 
                     const res: IProcMountRes = {
@@ -209,7 +218,7 @@ export class ProcessManagement {
                 case MessageType.UNMOUNT: {
                     let unmount = message as IProcUnmount;
                     let cwd = process.task.pwd;
-                    const mountpoint = this.kernel.vfs.lookup(cwd, unmount.path)!;
+                    const mountpoint = this.kernel.vfs.lookup(unmount.path, process.task)!;
                     await this.kernel.vfs.unmount(mountpoint.mount!, mountpoint.entry);
 
                     const res: IProcUnmountRes = {
@@ -222,7 +231,7 @@ export class ProcessManagement {
 
                 case MessageType.EXEC: {
                     let exec = message as IProcExec;
-                    let task = await this.createProcess(exec.path, exec.argv, process.task.pwd, process.task);
+                    let task = await this.createProcess(exec.path, exec.argv, process.task);
 
                     const res: IProcExecRes = {
                         type: MessageType.EXEC_RES,
@@ -237,7 +246,7 @@ export class ProcessManagement {
                     let chcwd = message as IProcChCwd;
                     let task = process.task;
 
-                    task.pwd = this.kernel.vfs.lookup(task.pwd, chcwd.path)!;
+                    task.pwd = this.kernel.vfs.lookup(chcwd.path, process.task)!;
                     const res: IProcChCwdRes = {
                         type: MessageType.CHCWD_RES,
                         id: message.id
@@ -256,13 +265,12 @@ export class ProcessManagement {
                     let task = process.task;
 
                     let cwd = process.task.pwd;
-                    let path = this.kernel.vfs.lookup(cwd, mkdir.path)!;
+                    let path = this.kernel.vfs.lookup(mkdir.path, process.task)!;
                     if (path.entry.inode != null){
                         throw "Already exists";
                     }
 
                     let entry = path.entry;
-                    debugger;
 
 
                     break;
@@ -280,8 +288,8 @@ export class ProcessManagement {
         }
     }
 
-    private async fetchDepCode(wd: IPath, dep: string): Promise<IDependency[]> {
-        let entry = this.kernel.vfs.lookup(wd, `/lib/${dep}.dyna`)!;
+    private async fetchDepCode(dep: string, task: IProtoTask): Promise<IDependency[]> {
+        let entry = this.kernel.vfs.lookup(`/lib/${dep}.dyna`, task)!;
         let file = await this.kernel.vfs.open(entry);
         let content = await file.operations.read(file, -1);
         let result: IDependency[] = [];
@@ -291,7 +299,7 @@ export class ProcessManagement {
         }
         let dynalibstruct: IDynaLib = JSON.parse(content.substring(8))
         for (let dep of dynalibstruct.dependencies) {
-            result = result.concat(await this.fetchDepCode(wd, dep))
+            result = result.concat(await this.fetchDepCode(dep, task))
         }
         result.push({
             name: dep,
@@ -313,8 +321,8 @@ export class ProcessManagement {
     }
 
 
-    async createProcess(path: string, argv: string[], wd: IPath, parent: ITask | undefined): Promise<ITask> {
-        let entry = this.kernel.vfs.lookup(wd, path)!;
+    async createProcess(path: string, argv: string[], parent: IProtoTask): Promise<ITask> {
+        let entry = this.kernel.vfs.lookup(path, parent)!;
         let file = await this.kernel.vfs.open(entry);
         let content = await file.operations.read(file, -1);
         if (!content.startsWith("PEXF:")) {
@@ -323,7 +331,7 @@ export class ProcessManagement {
         let pexfstruct: IPEXF = JSON.parse(content.substring(5));
         let dyna: IDependency[] = []
         for (let dep of pexfstruct.dependencies) {
-            dyna = dyna.concat(await this.fetchDepCode(wd, dep))
+            dyna = dyna.concat(await this.fetchDepCode(dep, parent))
         }
         let pid = this.genID();
         const p = procMkdir("" + pid, null);
@@ -335,8 +343,8 @@ export class ProcessManagement {
             operations: this.taskOperations,
             sys: true,
             pid: pid,
-            uid: parent ? parent.uid : 1,
-            gid: parent ? parent.gid : 1,
+            uid: parent.uid ? parent.uid : 1,
+            gid: parent.gid ? parent.gid : 1,
             waits: waits,
             proc: {
                 dir: p,
@@ -364,12 +372,13 @@ export class ProcessManagement {
                     })
                 })
             },
-            pwd: wd,
+            root: parent.root,
+            pwd: parent.pwd,
             files: {fileDescriptors: []},
-            parent: parent ? parent.pid : undefined,
+            parent: parent.pid ? parent.pid : undefined,
         };
 
-        let stdinp = this.kernel.vfs.lookup(wd, "/dev/console")!;
+        let stdinp = this.kernel.vfs.lookup("/dev/console", parent)!;
         let stdin = await this.kernel.vfs.open(stdinp);
         this.openFile(task, 0, stdin);
         this.openFile(task, 1, stdin);

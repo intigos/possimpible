@@ -20,7 +20,7 @@ const inodeOperators: IINodeOperations = {
         entry.inode = inode_new(node.superblock);
         entry.inode.map = x;
 
-        return null;
+        return entry;
     },
     getattr: async (vfsmount, dentry) => {
         return ""

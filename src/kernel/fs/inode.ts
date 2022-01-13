@@ -23,7 +23,7 @@ export interface IINodeOperations {
     // 	initialise the "d_dop" field in the dentry; this is a pointer
     // 	to a struct "dentry_operations".
     // 	This method is called with the directory inode semaphore held
-    lookup: (dir: IINode, dentry: IDEntry) => IDEntry | null
+    lookup?: (dir: IINode, dentry: IDEntry) => IDEntry | null
 
     //  link: called by the link(2) system call. Only required if you want
     // 	to support hard links. You will probably need to call

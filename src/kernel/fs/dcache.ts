@@ -8,7 +8,7 @@ export interface IDEntryOperations {
 }
 
 export interface IDEntry {
-    mounted: boolean;
+    mounted: number;
     parent?: IDEntry;
     name: string;
     inode: IINode | null;
@@ -27,7 +27,7 @@ export class DirectoryCache{
 
     allocAnon(sb: ISuperBlock|null, name: string): IDEntry{
         let dentry:IDEntry = {
-            mounted: false,
+            mounted: 0,
             name: name,
             inode: null,
             superblock: sb,
@@ -40,6 +40,10 @@ export class DirectoryCache{
 
     alloc(parent: IDEntry|null, name: string): IDEntry{
         if(parent){
+            const cache = this.lookup(parent, name);
+            if(cache){
+                return cache;
+            }
             let dentry = this.allocAnon(parent.superblock!, name);
 
             dentry.parent = parent;

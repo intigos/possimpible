@@ -2,21 +2,32 @@ import {IDEntry} from "./dcache";
 import {IPath, ISuperBlock} from "./vfs";
 import {IProcFSEntry, procCreate, procMkdir} from "./procfs/module";
 import {Kernel} from "../kernel";
+import {nameidata} from "./namei";
 
 export interface IVFSMount{
     root: IDEntry;
     superblock: ISuperBlock;
+    parent: IVFSMount|null;
+    mountpoint: IDEntry;
 }
 
 export interface IMount{
+    ns: number;
     parent?: IMount;
     mountpoint: IDEntry;
     mount: IVFSMount;
     children: IMount[];
 }
 
+export interface IMountNS{
+    parent:IMountNS|null;
+    mounts:IMount[]
+    children:IMountNS[]
+}
+
 export class MountManager{
     mounts:IMount[] = [];
+    namespaces:IMountNS[] = [];
     private procdir: IProcFSEntry;
 
     constructor(kernel: Kernel) {
@@ -30,6 +41,31 @@ export class MountManager{
             },
             write:(file, string) => {}
         });
+    }
+
+    createNS(parent: IMountNS|null, clone:boolean): IMountNS{
+        let m:IMountNS = {
+            parent: parent,
+            mounts: [],
+            children: []
+        }
+
+        this.namespaces.push(m);
+        if(parent){
+            if(clone){
+                for (const mount of parent.mounts) {
+                    mount.ns++;
+                    m.mounts.push(mount);
+                }
+
+                parent.children.push(m);
+            }
+        }
+        return m;
+    }
+
+    deleteNS(ns: IMountNS){
+
     }
 
     create(parent: IVFSMount|null, mountpoint: IDEntry, superblock: ISuperBlock): IVFSMount{
@@ -56,6 +92,7 @@ export class MountManager{
         if(parent){
             parentMount!.children.push(vfsmount);
         }
+        mountpoint.mounted++;
         return vfsmount.mount;
     }
 
@@ -82,7 +119,6 @@ export class MountManager{
 
     delete(parent: IVFSMount, dentry: IDEntry): ISuperBlock{
         for (let i of this.mounts){
-            debugger;
             if(i.mount.root == dentry){
                 const a = i.parent?.children!;
                 let index = a.indexOf(i);
@@ -95,7 +131,7 @@ export class MountManager{
                     this.mounts.splice(index, 1);
                 }
 
-                i.mountpoint.mounted = false;
+                i.mountpoint.mounted--;
                 i.mountpoint.superblock = null;
 
                 return i.mount.superblock
@@ -103,6 +139,19 @@ export class MountManager{
         }
         throw "ERROR";
     }
+
+    lookup(path: IPath): IPath|null {
+        for (let pathElement of this.mounts) {
+            if(pathElement.mountpoint == path.entry && pathElement.parent?.mount == path.mount){
+                return {
+                    entry: pathElement.mount.root,
+                    mount: pathElement.mount
+                };
+            }
+        }
+        return null;
+    }
+
 }
 
 
