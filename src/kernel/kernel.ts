@@ -22,6 +22,7 @@ export class Kernel{
     private options: Partial<IKernelOptions>;
     private namespaces: NamespaceManager;
     public current?: ITask;
+
     private devicetree?: IDeviceTree;
 
     constructor(options: Partial<IKernelOptions>){
@@ -88,6 +89,7 @@ export class Kernel{
         this.printk(`\ninit: starting ${this.options.initrc}`)
         try{
             await this.processes.createProcess(this.options.initrc, [], ktask);
+
             await this.processes.wait(1);
         }catch (e){
             if (e instanceof PError && e.code == Status.ENOENT){
