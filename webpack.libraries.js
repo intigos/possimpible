@@ -93,8 +93,8 @@ module.exports = (env = {}) => ({
     resolve: {
         extensions: ['.ts', '.js', '.vue', '.json'],
         alias: {
-            '@': '/Users/nurv/git/intigos/possimpible/src',
-            '&': '/Users/nurv/git/intigos/possimpible/dist',
+            '@': path.resolve(__dirname, '/src'),
+            '&': path.resolve(__dirname, '/dist'),
         }
     },
     plugins: [
