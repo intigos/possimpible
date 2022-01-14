@@ -60,6 +60,14 @@ export function blob_add_to_parent(parent: IBlobINode, dirent: BlobDirEnt_ptr, s
     (parent.map as BlobDirEnt_ptr[]).push(dirent)
 }
 
+export function blob_remove_from_parent(parent: IBlobINode, dirent: BlobDirEnt_ptr, sb: IBlobSuperNode){
+    const map = (parent.map as BlobDirEnt_ptr[]);
+    const index = map.indexOf(dirent);
+    if (index > -1) {
+        map.splice(index, 1);
+    }
+}
+
 export function blob_inode_find_child(node: IBlobINode, name: string, sb: IBlobSuperNode): BlobDirEnt_ptr|undefined{
     return (node.map as BlobDirEnt_ptr[]).find(x => sb.dirents[x]!.name ==  name);
 }

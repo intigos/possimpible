@@ -1,5 +1,5 @@
 import {IPath} from "./vfs";
-import {IProtoTask, ITask} from "../proc/process";
+import {IProtoTask} from "../proc/process";
 import {Kernel} from "../kernel";
 import {PError, Status} from "../../public/status";
 import {IINode} from "./inode";
@@ -11,13 +11,13 @@ export interface nameidata{
     root: IPath;
     inode?: IINode;
     last: string;
-    lastType: number;
+    lastType: Last;
     flags: number;
     depth: number;
     path: IPath;
 }
 
-enum Last{
+export enum Last{
     NORM,
     ROOT,
     DOT,
@@ -25,7 +25,7 @@ enum Last{
     BIND,
 }
 
-enum Lookup{
+export enum Lookup{
     // If the last component is a symbolic link, interpret (follow) it
     FOLLOW = 1,
     // The last component must be a directory
@@ -179,6 +179,29 @@ export class NameI{
                 throw new PError(Status.ENOTDIR);
             }
         }
+    }
+
+
+
+    lookup_create(nd: nameidata, is_dir: boolean){
+        if(nd.lastType != Last.NORM){
+            throw new PError(Status.EEXIST);
+        }
+
+        nd.flags &= ~Lookup.PARENT;
+        nd.flags |= Lookup.CREATE;
+        // intent O_EXCL;
+
+        let dentry = this.kernel.vfs.dcache.alloc(nd.path.entry, nd.last);
+        if(dentry.inode){
+            throw new PError(Status.EEXIST);
+        }
+
+        if(!is_dir && nd.last[nd.lastLen!]){
+            throw new PError(Status.EEXIST);
+        }
+
+        return dentry;
     }
 
     follow_up(path: IPath){

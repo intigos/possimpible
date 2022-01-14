@@ -13,12 +13,14 @@ import {
     IProcGetDEntsRes,
     IProcMessage,
     IProcMkdir,
+    IProcMkdirRes,
     IProcMount,
     IProcMountRes,
     IProcOpen,
     IProcOpenRes,
     IProcRead,
     IProcReadRes,
+    IProcRmdir,
     IProcUnmount,
     IProcUnmountRes,
     IProcWrite,
@@ -29,6 +31,7 @@ import {IFile, IPath} from "../fs/vfs";
 import {IDynaLib, IPEXF} from "../../shared/pexf";
 import {IProcFSEntry, procCreate, procMkdir, procRemove} from "../fs/procfs/module";
 import {PError, Status} from "../../public/status";
+import {Last, Lookup} from "../fs/namei";
 
 type pid = number;
 
@@ -264,15 +267,52 @@ export class ProcessManagement {
                     let mkdir = message as IProcMkdir;
                     let task = process.task;
 
-                    let cwd = process.task.pwd;
-                    let path = this.kernel.vfs.lookup(mkdir.path, process.task)!;
-                    if (path.entry.inode != null){
-                        throw "Already exists";
+                    const nd = this.kernel.vfs.namei.pathLookup(mkdir.path, Lookup.PARENT, task);
+
+                    let dentry = this.kernel.vfs.namei.lookup_create(nd, true);
+                    if (nd.path.entry.inode) {
+                        this.kernel.vfs.mkdir(nd.path.entry.inode, dentry)
+                    }else{
+                        throw new PError(Status.ENOENT);
                     }
 
-                    let entry = path.entry;
+                    const res: IProcMkdirRes = {
+                        type: MessageType.MKDIR_RES,
+                        id: message.id
+                    }
+                    container.operations.send(container, res)
+                    break;
+                }
 
+                case MessageType.RMDIR: {
+                    let rmdir = message as IProcRmdir;
+                    let task = process.task;
 
+                    const nd = this.kernel.vfs.namei.pathLookup(rmdir.path, Lookup.PARENT, task);
+
+                    switch (nd.lastType){
+                        case Last.DOTDOT:
+                            throw new PError(Status.ENOTEMPTY);
+                        case Last.DOT:
+                            throw new PError(Status.EINVAL);
+                        case Last.ROOT:
+                            throw new PError(Status.EBUSY);
+                    }
+
+                    nd.flags &= ~Lookup.PARENT;
+
+                    const dentry = this.kernel.vfs.dcache.lookup(nd.path.entry, nd.last);
+                    if (nd.path.entry.inode) {
+                        this.kernel.vfs.rmdir(nd.path.entry.inode, dentry!)
+                    }else{
+                        throw new PError(Status.ENOENT);
+                    }
+
+                    const res: IProcMkdirRes = {
+                        type: MessageType.MKDIR_RES,
+                        id: message.id
+                    }
+                    container.operations.send(container, res)
                     break;
                 }
             }

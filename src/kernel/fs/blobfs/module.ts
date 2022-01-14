@@ -20,7 +20,7 @@ import {
     blob_dirent_alloc,
     blob_get_data,
     blob_inode_alloc,
-    blob_inode_find_child,
+    blob_inode_find_child, blob_remove_from_parent,
     blob_set_data,
     BlobDirEnt_ptr,
     BlobINodeType,
@@ -96,12 +96,14 @@ const inodeOperators: IINodeOperations = {
     rmdir: (dir, dentry) => {
         const bn = dir.map as IBlobINode;
         const sb = dir.superblock.device as IBlobSuperNode;
+
         const direntpos = blob_inode_find_child(bn, dentry.name, sb);
 
         if(direntpos){
             const dirent = sb.dirents[direntpos]
             sb.dirents[direntpos] = null;
             sb.nodes[dirent!.node] = null;
+            blob_remove_from_parent(bn, direntpos, sb);
             // TODO: should erase all recursivelly
         }
     },

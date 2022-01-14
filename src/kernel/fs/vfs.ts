@@ -4,7 +4,7 @@ import {IVFSMount, MountManager} from "./mount";
 import {IDirectoryEntry} from "../../public/api";
 import {IINode} from "./inode";
 import {PError, Status} from "../../public/status";
-import {NameI} from "./namei";
+import {Lookup, NameI} from "./namei";
 import {IProtoTask, ITask} from "../proc/process";
 
 export interface IFileSystemType{
@@ -203,38 +203,13 @@ class DCache{
 
 const DIV = "/"
 
-function splitInSegments(path: string): string[]{
-    const seg : string[] = [];
-    if (!path.length) return seg;
-    if (path == "/") return [''];
-    let buf = "";
-    for(let i=0; i< path.length; i++){
-        let c = path[i];
-        if (c != DIV){
-            buf += c;
-            if (c == "\\"){
-                if(i + 1 < path.length){
-                    buf += path[i];
-                    i++;
-                    continue;
-                }
-            }
-        }else{
-            seg.push(buf);
-            buf = "";
-        }
-    }
-    seg.push(buf);
-    return seg;
-}
-
 export class VirtualFileSystem{
     filesystems: Record<string, IFileSystemType> = {};
     root: IDEntry|undefined;
     private kernel: Kernel;
     public mounts: MountManager;
     public dcache: DirectoryCache;
-    private namei: NameI;
+    public namei: NameI;
 
     constructor(kernel: Kernel) {
         this.kernel = kernel;
@@ -306,6 +281,27 @@ export class VirtualFileSystem{
             p = this.kernel.vfs.mounts.lookupMountpoint(mount!);
         }
         return {mount:mount, entry:entry};
+    }
+
+    mkdir(dir: IINode, dentry: IDEntry){
+        if (dir.operations.mkdir) {
+            dir.operations.mkdir(dir, dentry);
+        }else{
+            throw new PError(Status.EPERM);
+        }
+    }
+
+    rmdir(dir: IINode, dentry: IDEntry) {
+        if(!dir.operations.rmdir){
+            throw new PError(Status.EPERM);
+        }else{
+            if(dentry.mounted){
+                throw new PError(Status.EBUSY);
+            }else{
+                dir.operations.rmdir(dir, dentry);
+                this.kernel.vfs.dcache.invalidate(dentry);
+            }
+        }
     }
 
     lookup(path: string, task: IProtoTask|null): IPath{
