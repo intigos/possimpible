@@ -277,6 +277,27 @@ export class NameI{
             }
         }
     }
+
+    mkdir(dir: IINode, dentry: IDEntry){
+        if (dir.operations.mkdir) {
+            dir.operations.mkdir(dir, dentry);
+        }else{
+            throw new PError(Status.EPERM);
+        }
+    }
+
+    rmdir(dir: IINode, dentry: IDEntry) {
+        if(!dir.operations.rmdir){
+            throw new PError(Status.EPERM);
+        }else{
+            if(dentry.mounted){
+                throw new PError(Status.EBUSY);
+            }else{
+                dir.operations.rmdir(dir, dentry);
+                this.kernel.vfs.dcache.invalidate(dentry);
+            }
+        }
+    }
 }
 
 

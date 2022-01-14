@@ -5,10 +5,11 @@ import procfs from "./fs/procfs/module"
 import lorch from "./proc/lorch/module"
 import {ModularityManager} from "./sys/modules";
 import {NullDevice, TTYDevice} from "./sys/devices";
-import {ITask, ProcessManagement} from "./proc/process";
+import {IProtoTask, ITask, ProcessManagement} from "./proc/process";
 import {OrchestratorManagement} from "./proc/orchestrator";
 import {NamespaceManager, NSOperation} from "./ns/namespace";
 import {PError, Status} from "../public/status";
+import {Lookup} from "./fs/namei";
 
 interface IKernelOptions {
     root: any;
@@ -26,6 +27,7 @@ export class Kernel{
     public orchestrators: OrchestratorManagement;
     private options: Partial<IKernelOptions>;
     private namespaces: NamespaceManager;
+    public current?: ITask;
 
     constructor(options: Partial<IKernelOptions>){
         this.options = options;
@@ -36,6 +38,20 @@ export class Kernel{
         this.namespaces = new NamespaceManager(this);
         this.tty = this.options.tty || new NullDevice();
     }
+
+    private async init_mount_tree():Promise<IProtoTask>{
+        const root = this.vfs.lookup("/", null)!;
+        root.mount = await this.vfs.mount("", "", root.mount, root.entry, this.vfs.getFS("tmpfs"));
+        root.entry = root.mount.superblock.root;
+        const prototask = {root:root, pwd:root}
+
+        this.vfs.mkdir("/dev", prototask);
+        const dev = this.vfs.lookup("/dev", prototask)!;
+        await this.vfs.mount("", "", dev.mount, dev.entry, this.vfs.getFS("dev"));
+        this.vfs.mkdir("/root", prototask);
+
+        return prototask;
+    }
     
     async boot(){
         this.printk("Booting Kernel...");
@@ -44,31 +60,37 @@ export class Kernel{
         this.modules.installModule(procfs);
         this.modules.installModule(lorch);
 
+        const ktask = await this.init_mount_tree();
+
         if(!this.options.initrd){
-            this.panic("No initrd disk")
-            return
+            this.panic("No initrd disk");
+            return;
         }
+
         this.printk(`mounting initrd (size:${this.options.initrd.length}) into /`)
         const rootns = this.namespaces.create(NSOperation.NEW_MOUNT | NSOperation.NEW_PROC);
-        const root = this.vfs.lookup("/", null)!;
-        root.mount = await this.vfs.mount(this.options.initrd, "", root.mount, root.entry, this.vfs.getFS("blob"))
-        root.entry = root.mount.superblock.root;
+        let root = this.vfs.lookup("/root", ktask)!;
+        await this.vfs.mount(this.options.initrd, "", root.mount, root.entry, this.vfs.getFS("blob"))
 
-        const prototask = { root: root, pwd: root }
+        let dev = this.vfs.lookup("/dev", ktask)!;
+        await this.vfs.unmount(dev.mount!, dev.entry);
+        root = this.vfs.lookup("/root", ktask)!;
+        this.processes.chcwd(ktask, root);
+        this.processes.chroot(ktask, root);
 
-        const dev = this.vfs.lookup("/dev", prototask)!;
+        dev = this.vfs.lookup("/dev", ktask)!;
         await this.vfs.mount("", "", dev.mount, dev.entry, this.vfs.getFS("dev"));
 
-        const proc = this.vfs.lookup("/proc", prototask)!;
+        const proc = this.vfs.lookup("/proc", ktask)!;
         await this.vfs.mount("", "", proc.mount, proc.entry, this.vfs.getFS("proc"));
 
-        const run = this.vfs.lookup("/var/tmp", prototask)!;
+        const run = this.vfs.lookup("/var/tmp", ktask)!;
         await this.vfs.mount("", "", run.mount, run.entry, this.vfs.getFS("tmpfs"));
 
 
         this.printk(`\ninit: starting ${this.options.initrc}`)
         try{
-            await this.processes.createProcess(this.options.initrc, [], prototask);
+            await this.processes.createProcess(this.options.initrc, [], ktask);
             await this.processes.wait(1);
         }catch (e){
             if (e instanceof PError && e.code == Status.ENOENT){

@@ -4,7 +4,7 @@ import {IVFSMount, MountManager} from "./mount";
 import {IDirectoryEntry} from "../../public/api";
 import {IINode} from "./inode";
 import {PError, Status} from "../../public/status";
-import {Lookup, NameI} from "./namei";
+import {Last, Lookup, NameI} from "./namei";
 import {IProtoTask, ITask} from "../proc/process";
 
 export interface IFileSystemType{
@@ -253,17 +253,21 @@ export class VirtualFileSystem{
         }
     }
 
-    path(path: IPath): string{
+    path(path: IPath, task: IProtoTask): string{
         let buf = "";
         let p: IPath|undefined = path;
         while(p){
             let entry:any = p.entry;
             let mount = p.mount;
-            while(entry.parent != null){
+            while(entry.parent != null && entry != task.root.entry){
                 buf = "/" + entry.name + buf;
                 entry = entry.parent;
             }
-            p = this.kernel.vfs.mounts.lookupMountpoint(mount!);
+            if(entry != task.root.entry){
+                p = this.kernel.vfs.mounts.lookupMountpoint(mount!);
+            }else{
+                return buf.length ? buf : "/";
+            }
         }
         return buf.length ? buf : "/";
     }
@@ -283,24 +287,36 @@ export class VirtualFileSystem{
         return {mount:mount, entry:entry};
     }
 
-    mkdir(dir: IINode, dentry: IDEntry){
-        if (dir.operations.mkdir) {
-            dir.operations.mkdir(dir, dentry);
+    mkdir(path:string, task: IProtoTask){
+        const nd = this.namei.pathLookup(path, Lookup.PARENT, task);
+
+        let dentry = this.kernel.vfs.namei.lookup_create(nd, true);
+        if (nd.path.entry.inode) {
+            this.namei.mkdir(nd.path.entry.inode, dentry)
         }else{
-            throw new PError(Status.EPERM);
+            throw new PError(Status.ENOENT);
         }
     }
 
-    rmdir(dir: IINode, dentry: IDEntry) {
-        if(!dir.operations.rmdir){
-            throw new PError(Status.EPERM);
-        }else{
-            if(dentry.mounted){
+    rmdir(path: string, task: IProtoTask){
+        const nd = this.kernel.vfs.namei.pathLookup(path, Lookup.PARENT, task);
+
+        switch (nd.lastType){
+            case Last.DOTDOT:
+                throw new PError(Status.ENOTEMPTY);
+            case Last.DOT:
+                throw new PError(Status.EINVAL);
+            case Last.ROOT:
                 throw new PError(Status.EBUSY);
-            }else{
-                dir.operations.rmdir(dir, dentry);
-                this.kernel.vfs.dcache.invalidate(dentry);
-            }
+        }
+
+        nd.flags &= ~Lookup.PARENT;
+
+        const dentry = this.dcache.lookup(nd.path.entry, nd.last);
+        if (nd.path.entry.inode) {
+            this.namei.rmdir(nd.path.entry.inode, dentry!)
+        }else{
+            throw new PError(Status.ENOENT);
         }
     }
 

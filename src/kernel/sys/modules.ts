@@ -19,7 +19,6 @@ export class ModularityManager{
     }
 
     installModule(module: IKernelModule){
-        this.kernel.printk("insmod " + module.name);
         this.modules.push({
             module:module
         });

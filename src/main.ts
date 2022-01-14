@@ -33,7 +33,6 @@ class TerminalDevice extends TTYDevice{
             }else{
                 this.buffer += data
             }
-
         })
         fitAddon.fit();
         // @ts-ignore

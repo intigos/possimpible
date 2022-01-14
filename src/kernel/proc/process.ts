@@ -117,6 +117,7 @@ export class ProcessManagement {
 
     async handleProcess(message: IProcMessage, container: IContainer) {
         const process = this.containers.get(container.id)!;
+        this.kernel.current = process.task;
         try{
             switch (message.type) {
                 case MessageType.WRITE: {
@@ -154,7 +155,7 @@ export class ProcessManagement {
                     const res: IProcGetCwdRes = {
                         type: MessageType.GETCWD_RES,
                         id: message.id,
-                        cwd: this.kernel.vfs.path(process.task.pwd)
+                        cwd: this.kernel.vfs.path(process.task.pwd, process.task)
                     }
                     container.operations.send(container, res)
                     break;
@@ -249,7 +250,8 @@ export class ProcessManagement {
                     let chcwd = message as IProcChCwd;
                     let task = process.task;
 
-                    task.pwd = this.kernel.vfs.lookup(chcwd.path, process.task)!;
+                    const path = this.kernel.vfs.lookup(chcwd.path, process.task)!;
+                    this.chcwd(task, path);
                     const res: IProcChCwdRes = {
                         type: MessageType.CHCWD_RES,
                         id: message.id
@@ -267,14 +269,7 @@ export class ProcessManagement {
                     let mkdir = message as IProcMkdir;
                     let task = process.task;
 
-                    const nd = this.kernel.vfs.namei.pathLookup(mkdir.path, Lookup.PARENT, task);
-
-                    let dentry = this.kernel.vfs.namei.lookup_create(nd, true);
-                    if (nd.path.entry.inode) {
-                        this.kernel.vfs.mkdir(nd.path.entry.inode, dentry)
-                    }else{
-                        throw new PError(Status.ENOENT);
-                    }
+                    this.kernel.vfs.mkdir(mkdir.path, task)
 
                     const res: IProcMkdirRes = {
                         type: MessageType.MKDIR_RES,
@@ -288,25 +283,7 @@ export class ProcessManagement {
                     let rmdir = message as IProcRmdir;
                     let task = process.task;
 
-                    const nd = this.kernel.vfs.namei.pathLookup(rmdir.path, Lookup.PARENT, task);
-
-                    switch (nd.lastType){
-                        case Last.DOTDOT:
-                            throw new PError(Status.ENOTEMPTY);
-                        case Last.DOT:
-                            throw new PError(Status.EINVAL);
-                        case Last.ROOT:
-                            throw new PError(Status.EBUSY);
-                    }
-
-                    nd.flags &= ~Lookup.PARENT;
-
-                    const dentry = this.kernel.vfs.dcache.lookup(nd.path.entry, nd.last);
-                    if (nd.path.entry.inode) {
-                        this.kernel.vfs.rmdir(nd.path.entry.inode, dentry!)
-                    }else{
-                        throw new PError(Status.ENOENT);
-                    }
+                    this.kernel.vfs.rmdir(rmdir.path, task)
 
                     const res: IProcMkdirRes = {
                         type: MessageType.MKDIR_RES,
@@ -346,6 +323,20 @@ export class ProcessManagement {
             code: dynalibstruct.code
         });
         return result;
+    }
+
+    public chroot(task: IProtoTask, path: IPath){
+        task.root = {
+         entry: path.entry,
+         mount: path.mount
+        }
+    }
+
+    public chcwd(task: IProtoTask, path: IPath){
+        task.pwd = {
+            entry: path.entry,
+            mount: path.mount
+        }
     }
 
     private openFile(task: ITask, pos: number, file: IFile) {
