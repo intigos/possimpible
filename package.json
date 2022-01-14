@@ -7,7 +7,7 @@
     "buildboot": "./node_modules/webpack/bin/webpack.js",
     "linkworker": "./node_modules/browserify/bin/cmd.js dist/worker/proc/main.js -p esmify -o dist/worker.img",
     "compileworker": "tsc --project tsconfig.worker.json",
-    "buildworker": "yarn run compileworker && yarn run linkworker && rm -dR dist/worker/",
+    "buildworker": "yarn run compileworker && yarn run linkworker && rm -R dist/worker/",
     "compileexecs": "./node_modules/webpack/bin/webpack.js --config webpack.toolchain.js",
     "buildtoolchain": "yarn compiletoolchain && yarn run buildinitrd",
     "compiletoolchain": "yarn compilelibraries && yarn compileexecs",
