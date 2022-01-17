@@ -7,12 +7,9 @@ import "xterm/css/xterm.css";
 
 // @ts-ignore
 import initrd from "&/initrd.img";
+import {DeviceDetail, discover} from "./vm/devicetree";
 import {VirtualMachine} from "./vm/vm";
-import {
-    DeviceDetail,
-    discover,
-    IDeviceTree
-} from "./vm/devicetree";
+
 
 class TerminalDevice{
     private term: Terminal;
@@ -21,7 +18,7 @@ class TerminalDevice{
 
     constructor(el: HTMLElement) {
         this.term = new Terminal({
-            fontFamily: "JetBrains Mono",
+            fontFamily: "JetBrainsMono",
             fontSize:13,
             rendererType: "dom"
         });

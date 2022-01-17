@@ -1,5 +1,3 @@
-import uaparser from 'ua-parser-js'
-
 export interface IDeviceProperties{
     compatibility: string[]
 }
