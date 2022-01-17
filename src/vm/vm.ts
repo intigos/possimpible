@@ -1,15 +1,15 @@
 import {Kernel} from "../kernel/kernel";
-import {IDeviceTree} from "./devicetree";
+import {IDeviceDescription, IDeviceTree} from "./devicetree";
 
 export class VirtualMachine{
-    private devicetree: IDeviceTree;
+    private devices: IDeviceDescription[];
 
-    constructor(ds: IDeviceTree) {
-        this.devicetree = ds;
+    constructor(ds: IDeviceDescription[]) {
+        this.devices = ds;
     }
 
     async boot(kernel: Kernel){
-        return await kernel.boot(this.devicetree);
+        return await kernel.boot(this.devices);
     }
 }
 

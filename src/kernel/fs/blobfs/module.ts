@@ -153,33 +153,14 @@ const inodeOperators: IINodeOperations = {
 }
 
 const fileOperations: IFileOperations = {
-    open: async (node, entry: IDEntry): Promise<IFile> => {
-        let bn = node.map as IBlobINode;
-        let sb = node.superblock.device as IBlobSuperNode;
-        if (bn.type === BlobINodeType.DIRECTORY){
-            return {
-                position: 0,
-                size: ((node.map as IBlobINode).map as BlobDirEnt_ptr[]).length,
-                dentry: entry,
-                operations: fileOperations
-            }
-        }else{
-            return {
-                position: 0,
-                size: blob_get_data(node.map as IBlobINode, sb)!.length,
-                dentry: entry,
-                operations: fileOperations
-            }
-        }
-    },
-
     llseek: async (file: IFile, offset: number, origin: LLSeekWhence): Promise<number> => {
         switch (origin) {
             case LLSeekWhence.SEEK_SET:
                 file.position = offset;
                 break;
             case LLSeekWhence.SEEK_END:
-                file.position = file.size - offset;
+                // TODO: file no longer has size:
+                file.position = 100 - offset;
                 break;
             case LLSeekWhence.SEEK_CUR:
                 file.position = file.position + offset;
@@ -207,21 +188,6 @@ const fileOperations: IFileOperations = {
             file.dentry.superblock?.device)
     },
 
-    readdir: async (dirent: IDirectoryEntry): Promise<IDirectoryEntry> => {
-        // TODO: not implemented
-        return {name: ""}
-    },
-
-    poll: async (file: IFile, pollfd) => {
-        // TODO: not implemented
-        return;
-    },
-
-    ioctl: async (file: IFile, cmd: number, arg: number): Promise<number> => {
-        // TODO: not implemented
-        return 0;
-    },
-
     iterate: async (file) => {
         const dirbn = file.dentry.inode!.map as IBlobINode;
         const sb = file.dentry.inode!.superblock.device as IBlobSuperNode;
@@ -241,22 +207,6 @@ const fileOperations: IFileOperations = {
             }
         })
     },
-
-    flush: (file: IFile) => {
-        //  TODO: not implemented
-    },
-
-    release: (inode: IINode, file: IFile) => {
-
-    },
-
-    fsync: (file: IFile, dentry: IDEntry, datasync: boolean) => {
-        // TODO: not implemented
-    },
-
-    lock: (file: IFile, operation: LockOperation) => {
-
-    }
 }
 
 const superBlockOperations:ISuperBlockOperations = {
@@ -302,7 +252,10 @@ const superBlockOperations:ISuperBlockOperations = {
 }
 
 async function mount(device: string, options: string): Promise<ISuperBlock>{
-    let txt = await(await (await fetch(device)).blob()).text();
+    const path = KERNEL.vfs.lookup(device, KERNEL.current!)
+    const file = await KERNEL.vfs.open(path);
+    const img = await file.operations.read!(file, 0);
+    let txt = await(await (await fetch(img)).blob()).text();
     let content = JSON.parse(txt) as IBlobSuperNode;
 
     const entry = KERNEL.vfs.dcache.alloc(null, "");
@@ -353,7 +306,7 @@ const tmpfs: IFileSystemType = {
     unmount: (sb: ISuperBlock) => {}
 }
 
-let KERNEL;
+let KERNEL: Kernel;
 function init(kernel: Kernel){
     KERNEL = kernel;
     kernel.vfs.registerFS(fs);

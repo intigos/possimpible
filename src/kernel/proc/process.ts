@@ -31,7 +31,6 @@ import {IFile, IPath} from "../fs/vfs";
 import {IDynaLib, IPEXF} from "../../shared/pexf";
 import {IProcFSEntry, procCreate, procMkdir, procRemove} from "../fs/procfs/module";
 import {PError, Status} from "../../public/status";
-import {Last, Lookup} from "../fs/namei";
 
 type pid = number;
 
@@ -66,7 +65,7 @@ export interface IProtoTask{
     pwd: IPath;
 }
 
-export interface ITask {
+export interface ITask extends IProtoTask{
     status: ITaskStatus,
     pid: number,
     uid: number,
@@ -138,7 +137,12 @@ export class ProcessManagement {
                     let read = message as IProcRead;
                     const file = process.task.files.fileDescriptors[read.fd];
                     if (file) {
-                        let buf = await file.operations.read(file, read.count);
+                        let buf;
+                        if(file.operations.read){
+                            buf = await file.operations.read(file, read.count);
+                        }else{
+                            throw new PError(Status.EINVAL);
+                        }
 
                         const res: IProcReadRes = {
                             type: MessageType.READ_RES,
@@ -192,12 +196,15 @@ export class ProcessManagement {
                     const file = process.task.files.fileDescriptors[getdents.fd];
 
                     if (file) {
-                        const res: IProcGetDEntsRes = {
-                            type: MessageType.GETDENTS_RES,
-                            id: message.id,
-                            dirents: await file.operations.iterate(file)
+                        if(file.operations.iterate){
+                            const res: IProcGetDEntsRes = {
+                                type: MessageType.GETDENTS_RES,
+                                id: message.id,
+                                dirents: await file.operations.iterate(file)
+                            }
+                            container.operations.send(container, res)
                         }
-                        container.operations.send(container, res)
+                        throw new PError(Status.ENOTDIR);
                     } else {
                         throw new PError(Status.EBADFD);
                     }
@@ -308,7 +315,13 @@ export class ProcessManagement {
     private async fetchDepCode(dep: string, task: IProtoTask): Promise<IDependency[]> {
         let entry = this.kernel.vfs.lookup(`/lib/${dep}.dyna`, task)!;
         let file = await this.kernel.vfs.open(entry);
-        let content = await file.operations.read(file, -1);
+        let content = "";
+        if(file.operations.read){
+            content = await file.operations.read(file, -1);
+        }else{
+            throw new PError(Status.EINVAL);
+        }
+
         let result: IDependency[] = [];
         if (!content.startsWith("dynalib:")) {
             // TODO
@@ -347,7 +360,7 @@ export class ProcessManagement {
                     await file.operations.write(file, buf);
                 }
             },
-            read: (f, count) => file.operations.read(file, count)
+            read: (f, count) => file.operations.read!(file, count)
         })
     }
 
@@ -355,7 +368,13 @@ export class ProcessManagement {
     async createProcess(path: string, argv: string[], parent: IProtoTask): Promise<ITask> {
         let entry = this.kernel.vfs.lookup(path, parent)!;
         let file = await this.kernel.vfs.open(entry);
-        let content = await file.operations.read(file, -1);
+        let content;
+        if(file.operations.read){
+            content = await file.operations.read!(file, -1);
+        }else{
+            throw new PError(Status.EINVAL);
+        }
+
         if (!content.startsWith("PEXF:")) {
             throw new PError(Status.ENOEXEC);
         }
@@ -409,7 +428,7 @@ export class ProcessManagement {
             parent: parent.pid ? parent.pid : undefined,
         };
 
-        let stdinp = this.kernel.vfs.lookup("/dev/console", parent)!;
+        let stdinp = this.kernel.vfs.lookup("/dev/tty0", parent)!;
         let stdin = await this.kernel.vfs.open(stdinp);
         this.openFile(task, 0, stdin);
         this.openFile(task, 1, stdin);

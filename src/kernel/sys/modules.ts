@@ -1,4 +1,7 @@
 import {Kernel} from "../kernel";
+import blobfs from "../fs/blobfs/module";
+import procfs from "../fs/procfs/module";
+import lorch from "../proc/lorch/module";
 
 export interface IKernelModule{
     name: string;

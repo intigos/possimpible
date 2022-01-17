@@ -9,7 +9,7 @@ import {IProtoTask, ITask} from "../proc/process";
 
 export interface IFileSystemType{
     name: string;
-    mount: (device: string, options:string) => Promise<ISuperBlock>;
+    mount: (device: string, options:string, kernel: Kernel) => Promise<ISuperBlock>;
     unmount: (sb: ISuperBlock) => void;
 }
 
@@ -80,7 +80,6 @@ export enum MkNodeMode {
 
 export interface IFile {
     position: number;
-    size: number;
     dentry: IDEntry;
     operations: IFileOperations;
 }
@@ -102,7 +101,7 @@ export interface IPollTable {
 }
 
 export interface IFileOperations {
-    open: (node: IINode, entry: IDEntry) => Promise<IFile>
+    open?: (node: IINode, entry: IFile) => void
 
     // The _llseek() system call repositions the offset of the open file
     // description associated with the file descriptor fd to the value
@@ -116,26 +115,26 @@ export interface IFileOperations {
     //
     // The new file offset is returned in the argument result.  The
     // type loff_t is a 64-bit signed type.
-    llseek: (file :IFile, offset:number, origin:LLSeekWhence) => Promise<number>;
+    llseek?: (file :IFile, offset:number, origin:LLSeekWhence) => Promise<number>;
 
     // The readdir() function returns a pointer to a dirent structure
     // representing the next directory entry in the directory stream
     // pointed to by dirp.  It returns NULL on reaching the end of the
     // directory stream or if an error occurred.
-    readdir: (dirent: IDirectoryEntry) => Promise<IDirectoryEntry>;
+    readdir?: (dirent: IDirectoryEntry) => Promise<IDirectoryEntry>;
 
     // poll() performs a similar task to select(2): it waits for one of
     // a set of file descriptors to become ready to perform I/O.  The
     // Linux-specific epoll(7) API performs a similar task, but offers
     // features beyond those found in poll().
-    poll: (file: IFile, pollfd: IPollTable) => Promise<void>;
+    poll?: (file: IFile, pollfd: IPollTable) => Promise<void>;
 
     // The ioctl() system call manipulates the underlying device
     // parameters of special files.  In particular, many operating
     // characteristics of character special files (e.g., terminals) may
     // be controlled with ioctl() requests.  The argument fd must be an
     // open file descriptor.
-    ioctl: (file: IFile, cmd: number, arg: number) => Promise<number>;
+    ioctl?: (file: IFile, cmd: number, arg: number) => Promise<number>;
 
     // mmap -> does not make sense in this context;
 
@@ -147,14 +146,14 @@ export interface IFileOperations {
     // files, but not pipes or terminals), fflush() discards any
     // buffered data that has been fetched from the underlying file, but
     // has not been consumed by the application.
-    flush: (file: IFile) => void;
+    flush?: (file: IFile) => void;
 
     //
     // The role of the release method is the reverse of open. Sometimes
     // you’ll find that the method implementation is called device _close
     // instead of device _release. Either way, the device method should
     // perform the following tasks:
-    release: (inode: IINode, file: IFile) => void;
+    release?: (inode: IINode, file: IFile) => void;
 
     // fsync() transfers ("flushes") all modified in-core data of (i.e.,
     // modified buffer cache pages for) the file referred to by the file
@@ -163,10 +162,10 @@ export interface IFileOperations {
     // the system crashes or is rebooted.  This includes writing through
     // or flushing a disk cache if present.  The call blocks until the
     // device reports that the transfer has completed.
-    fsync: (file: IFile, dentry: IDEntry, datasync: boolean) => void;
+    fsync?: (file: IFile, dentry: IDEntry, datasync: boolean) => void;
     // Apply or remove an advisory lock on the open file specified by fd.
     // The argument operation is one of the following:
-    lock: (file: IFile, operation: LockOperation) => void;
+    lock?: (file: IFile, operation: LockOperation) => void;
 
     // sendfile() copies data between one file descriptor and another.
     // Because this copying is done within the kernel, sendfile() is
@@ -174,9 +173,9 @@ export interface IFileOperations {
     // which would require transferring data to and from user space.
     sendfile?: (outfile: IFile, infile: IFile, offset: number, count: number) => void;
 
-    read: (file: IFile, count?: number) => Promise<string>;
+    read?: (file: IFile, count?: number) => Promise<string>;
     write?: (file: IFile, buf: string) => Promise<void>;
-    iterate: (file: IFile) => Promise<IDirectoryEntry[]>;
+    iterate?: (file: IFile) => Promise<IDirectoryEntry[]>;
 }
 
 export function dir_add_dots(list: IDirectoryEntry[]){
@@ -219,7 +218,7 @@ export class VirtualFileSystem{
     }
 
     async mount(device: string, options:string, mount: IVFSMount|null, entry: IDEntry, filesystem:IFileSystemType): Promise<IVFSMount>{
-        let sb = await filesystem.mount(device, options);
+        let sb = await filesystem.mount(device, options, this.kernel);
         let vfsmnt = this.mounts.create(mount, entry, sb);
 
         entry.superblock = sb;
@@ -245,8 +244,14 @@ export class VirtualFileSystem{
 
     async open(path: IPath): Promise<IFile>{
         if(path.entry.inode){
-            const file = await path.entry.inode!.fileOperations.open(path.entry.inode!, path.entry);
-            file.dentry = path.entry;
+            const file:IFile = {
+                position: 0,
+                dentry: path.entry,
+                operations: path.entry.inode.fileOperations
+            };
+            if(path.entry.inode!.fileOperations.open){
+                await path.entry.inode!.fileOperations.open(path.entry.inode!, file);
+            }
             return file;
         }else{
             throw new PError(Status.ENOENT);

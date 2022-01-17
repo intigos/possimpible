@@ -2,22 +2,24 @@ import {Terminal} from "xterm";
 import {FitAddon} from "xterm-addon-fit";
 import * as XtermWebfont from 'xterm-webfont'
 
-import {TTYDevice} from "./kernel/sys/devices";
 import {Kernel} from "./kernel/kernel";
 import "xterm/css/xterm.css";
 
 // @ts-ignore
 import initrd from "&/initrd.img";
 import {VirtualMachine} from "./vm/vm";
-import {discover, DSDisplay, DSKeyboard, DSNode, DSProperty, DSStorage, IDeviceTree} from "./vm/devicetree";
+import {
+    DeviceDetail,
+    discover,
+    IDeviceTree
+} from "./vm/devicetree";
 
-class TerminalDevice extends TTYDevice{
+class TerminalDevice{
     private term: Terminal;
     private resolve: ((value: (string | PromiseLike<string>)) => void) | undefined;
     private buffer: string = "";
 
     constructor(el: HTMLElement) {
-        super();
         this.term = new Terminal({
             fontFamily: "JetBrains Mono",
             fontSize:13,
@@ -61,67 +63,29 @@ class TerminalDevice extends TTYDevice{
 
 const terminal = new TerminalDevice(document.getElementById("term")!);
 
-class BlobStorage extends DSStorage{
-    private image: any;
-
-    constructor(image: any) {
-        super();
-        this.image = image;
-    }
-
-    attach(): IDeviceTree[] {
-        return [
-            DSProperty("read", (count: number) => terminal.read(count)),
-            DSProperty("write", () => 1)
-        ];
-    }
-}
-
-class DebugScreen extends DSDisplay{
-    constructor() {
-        super();
-    }
-
-    attach(): IDeviceTree[] {
-        return [
-            DSProperty("write", (buf: string) => terminal.write(buf))
-        ];
-    }
-}
-
-class Keyboard extends DSKeyboard{
-    constructor() {
-        super();
-    }
-
-    attach(): IDeviceTree[] {
-        return [
-            DSProperty("read", (count: number) => terminal.read(count))
-        ];
-    }
-}
-
 window.onload = async () => setTimeout(async x => {
     const vm = new VirtualMachine(discover([
-        DSNode("storage", [
-            DSNode("initrd0", new BlobStorage(initrd).attach())
-        ]),
+        DeviceDetail("initrd0", {
+            compatibility: ["storage:image"],
+            image: initrd
+        }),
 
-        DSNode("display", [
-            DSNode("serial", new DebugScreen().attach()),
-            DSNode("console", [
-                DSProperty("write", (buf: string) => console.log(buf))
-            ])
-        ]),
+        DeviceDetail("serial", {
+            compatibility: ["serial:terminal"],
+            write: (buf: string) => terminal.write(buf),
+            read: (count: number) => terminal.read(count)
+        }),
 
-        DSNode("input", [
-            DSNode("keyboard0", new Keyboard().attach())
-        ]),
+        DeviceDetail("console", {
+            compatibility: ["display:console"],
+            write: (buf: string) => console.log(buf)
+        }),
     ]));
 
     await vm.boot(new Kernel({
-        console: "/dev/tty0",
+        serial: "/dev/tty0",
         root: "/dev/initrd0",
+        rootfs: "blob",
         initrc: "/bin/init"
     }));
 }, 100);

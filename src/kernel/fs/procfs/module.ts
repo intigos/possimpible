@@ -6,7 +6,6 @@ import {
     IFileSystemType, IPollTable,
     ISuperBlock, ISuperBlockOperations, LLSeekWhence, LockOperation
 } from "../vfs";
-import {IDevice} from "../../sys/devices";
 import {IDEntry, IDEntryOperations} from "../dcache";
 import {IDirectoryEntry} from "../../../public/api";
 import {IINode, IINodeOperations, inode_new} from "../inode";
@@ -85,42 +84,6 @@ const inodeOperators: IINodeOperations = {
 }
 
 const fileOperations: IFileOperations = {
-    flush(file: IFile): void {
-    },
-
-    fsync(file: IFile, dentry: IDEntry, datasync: boolean): void {
-    },
-
-    ioctl(file: IFile, cmd: number, arg: number): Promise<number> {
-        return Promise.resolve(0);
-    },
-
-    llseek(file: IFile, offset: number, origin: LLSeekWhence): Promise<number> {
-        return Promise.resolve(0);
-    },
-
-    lock(file: IFile, operation: LockOperation): void {
-    },
-
-    poll(file: IFile, pollfd: IPollTable): Promise<void> {
-        return Promise.resolve(undefined);
-    },
-
-    readdir: async (dirent): Promise<IDirectoryEntry> =>{
-        return {name: ""};
-    },
-
-    release(inode: IINode, file: IFile): void {
-    },
-
-    open: async (node, entry: IDEntry): Promise<IFile> => {
-        return {
-            position:0,
-            size:0,
-            dentry: entry,
-            operations: fileOperations
-        }
-    },
     read: async (file, count) => {
         const entry = file.dentry.inode!.map as IProcFSEntry;
         return entry.operations!.read(file, count);
