@@ -3,6 +3,8 @@
 
 A (UNIX|Plan9) Kernel for the browser written in TypeScript
 
+[Demo](https://intigos.github.io/possimpible/) (username: barney)
+
 ## Project setup
 ```
 yarn install
