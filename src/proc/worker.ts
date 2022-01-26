@@ -1,21 +1,24 @@
 import {
+    FileDescriptor,
+    IProcBind,
+    IProcBindRes,
     IProcChCwd,
-    IProcClose,
-    IProcDie, IProcError,
+    IProcClose, IProcCreate, IProcCreateRes,
+    IProcDie,
+    IProcError,
     IProcExec,
     IProcExecRes,
     IProcGetCwd,
     IProcGetCwdRes,
-    IProcGetDEnts,
-    IProcGetDEntsRes,
     IProcMessage,
-    IProcMkdir,
     IProcMount,
+    IProcMountRes,
     IProcOpen,
-    IProcOpenRes,
+    IProcOpenRes, IProcPipe, IProcPipeRes,
     IProcRead,
     IProcReadRes,
-    IProcRmdir,
+    IProcRemove,
+    IProcRemoveRes,
     IProcStart,
     IProcUnmount,
     IProcWrite,
@@ -23,8 +26,7 @@ import {
     MessageID,
     MessageType,
 } from "../shared/proc";
-import {FileDescriptor, IDirectoryEntry, ISystemCalls, OpenOptions} from "../public/api";
-import {PError, Status} from "../public/status";
+import {ISystemCalls, MountType, OpenMode, PError, Status} from "../public/api";
 
 export class Process{
     private router = new Map<MessageID, (message: IProcMessage) => void>();
@@ -34,15 +36,16 @@ export class Process{
         write: this.sys_write.bind(this),
         open: this.sys_open.bind(this),
         getcwd: this.sys_getcwd.bind(this),
-        getdents: this.sys_getdents.bind(this),
+        remove: this.sys_remove.bind(this),
         close: this.sys_close.bind(this),
         exec: this.sys_exec.bind(this),
         chcwd: this.sys_chcwd.bind(this),
         die: this.sys_die.bind(this),
+        bind: this.sys_bind.bind(this),
         mount: this.sys_mount.bind(this),
         unmount: this.sys_unmount.bind(this),
-        mkdir: this.sys_mkdir.bind(this),
-        rmdir: this.sys_rmdir.bind(this),
+        pipe: this.sys_pipe.bind(this),
+        create: this.sys_create.bind(this)
     }
 
     private uuidv4() {
@@ -71,7 +74,7 @@ export class Process{
                 (self as any)[dep.name] = null;
                 eval(dep.code);
             }
-            eval(startMsg.code);
+            console.log(eval(startMsg.code));
         }
     }
 
@@ -117,7 +120,7 @@ export class Process{
         const res = await this.callWithPromise(param) as IProcWriteRes;
     }
 
-    private async sys_open(path: string, flags: OpenOptions): Promise<FileDescriptor>{
+    private async sys_open(path: string, flags: OpenMode): Promise<FileDescriptor>{
         const param: IProcOpen = {
             type: MessageType.OPEN,
             id: this.uuidv4(),
@@ -139,16 +142,15 @@ export class Process{
         this.call(param);
     }
 
-    private async sys_getdents(fd: FileDescriptor, count: number) : Promise<IDirectoryEntry[]>{
-        const param: IProcGetDEnts = {
-            type: MessageType.GETDENTS,
+    private async sys_remove(path: string) : Promise<void>{
+        const param: IProcRemove = {
+            type: MessageType.REMOVE,
             id: this.uuidv4(),
-            fd,
-            count,
+            path: path
         };
-        const res = await this.callWithPromise(param) as IProcGetDEntsRes;
+        const res = await this.callWithPromise(param) as IProcRemoveRes;
 
-        return res.dirents;
+        return;
     }
 
     private async sys_getcwd() : Promise<string>{
@@ -195,16 +197,33 @@ export class Process{
         return
     }
 
-    private async sys_mount(fstype: string, device: string, options: string, mountpoint: string){
+    private async sys_mount(fd: FileDescriptor, afd: FileDescriptor|null, old: string, flags?:number, aname?: string){
         const param: IProcMount = {
-            device: device, fstype: fstype, options: options,
+            fd: fd,
+            afd: afd,
+            old: old,
+            flag: flags || MountType.REPL,
+            aname: aname || null,
             type: MessageType.MOUNT,
             id: this.uuidv4(),
-            mountpoint: mountpoint
         };
 
         // wait to block
-        const res = await this.callWithPromise(param) as IProcExecRes;
+        const res = await this.callWithPromise(param) as IProcMountRes;
+        return
+    }
+
+    private async sys_bind(name: string, old: string, flags?: MountType){
+        const param: IProcBind = {
+            name: name,
+            old: old,
+            flags: flags || MountType.REPL,
+            type: MessageType.BIND,
+            id: this.uuidv4(),
+        };
+
+        // wait to block
+        const res = await this.callWithPromise(param) as IProcBindRes;
         return
     }
 
@@ -220,27 +239,27 @@ export class Process{
         return
     }
 
-    private async sys_mkdir(path:string){
-        const param: IProcMkdir = {
-            type: MessageType.MKDIR,
+    private async sys_create(path:string, mode: number): Promise<FileDescriptor>{
+        const param: IProcCreate = {
+            type: MessageType.CREATE,
             id: this.uuidv4(),
             path: path,
+            mode: mode
         };
 
         // wait to block
-        const res = await this.callWithPromise(param) as IProcExecRes;
-        return
+        const res = await this.callWithPromise(param) as IProcCreateRes;
+        return res.fd;
     }
 
-    private async sys_rmdir(path:string){
-        const param: IProcRmdir = {
-            type: MessageType.RMDIR,
+    private async sys_pipe(): Promise<FileDescriptor[]>{
+        const param: IProcPipe = {
+            type: MessageType.PIPE,
             id: this.uuidv4(),
-            path: path,
         };
 
         // wait to block
-        const res = await this.callWithPromise(param) as IProcExecRes;
-        return
+        const res = await this.callWithPromise(param) as IProcPipeRes;
+        return res.fds;
     }
 }

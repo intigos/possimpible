@@ -1,37 +1,41 @@
-import {FileDescriptor, IDirectoryEntry, OpenOptions} from "../public/api";
-import {Status} from "../public/status";
+import {MountType, OpenMode, Status} from "../public/api";
 
 export type MessageID = string
 
 export enum MessageType{
     READY,
     START,
-    READ,
+
+    READ = 10,
     WRITE,
     OPEN,
+    CREATE,
     CLOSE,
-    GETDENTS,
     GETCWD,
     EXEC,
+    FORK,
     CHCWD,
-    DIE,
     MOUNT,
+    BIND,
     UNMOUNT,
-    MKDIR,
-    RMDIR,
+    REMOVE,
+    PIPE,
+    DIE,
 
-
-    READ_RES,
+    READ_RES = 100,
     WRITE_RES,
     OPEN_RES,
-    GETDENTS_RES,
+    CREATE_RES,
+    CLOSE_RES,
     GETCWD_RES,
     EXEC_RES,
+    FORK_RES,
     CHCWD_RES,
     MOUNT_RES,
+    BIND_RES,
     UNMOUNT_RES,
-    MKDIR_RES,
-    RMDIR_RES,
+    REMOVE_RES,
+    PIPE_RES,
     ERROR,
 }
 
@@ -51,6 +55,8 @@ export interface IProcStart extends IProcMessage{
     argv: string[],
     dyna: IDependency[],
 }
+
+export type FileDescriptor = number
 
 export interface IProcRead extends IProcMessage{
     type: MessageType.READ,
@@ -78,7 +84,7 @@ export interface IProcWriteRes extends IProcMessage{
 export interface IProcOpen extends IProcMessage{
     type:MessageType.OPEN,
     path: string,
-    flags: OpenOptions
+    flags: OpenMode
 }
 
 export interface IProcOpenRes extends IProcMessage{
@@ -86,20 +92,20 @@ export interface IProcOpenRes extends IProcMessage{
     fd:FileDescriptor
 }
 
-export interface IProcClose extends IProcMessage{
-    type:MessageType.CLOSE,
+export interface IProcCreate extends IProcMessage{
+    type:MessageType.CREATE,
+    path: string,
+    mode: number
+}
+
+export interface IProcCreateRes extends IProcMessage{
+    type:MessageType.CREATE_RES,
     fd:FileDescriptor
 }
 
-export interface IProcGetDEnts extends IProcMessage{
-    type:MessageType.GETDENTS,
-    fd:FileDescriptor,
-    count: number,
-}
-
-export interface IProcGetDEntsRes extends IProcMessage{
-    type:MessageType.GETDENTS_RES,
-    dirents: IDirectoryEntry[]
+export interface IProcClose extends IProcMessage{
+    type:MessageType.CLOSE,
+    fd:FileDescriptor
 }
 
 export interface IProcGetCwd extends IProcMessage{
@@ -138,10 +144,11 @@ export interface IProcDie extends IProcMessage{
 
 export interface IProcMount extends IProcMessage{
     type: MessageType.MOUNT,
-    fstype: string,
-    device: string,
-    options: string,
-    mountpoint: string
+    fd: FileDescriptor,
+    afd: FileDescriptor|null,
+    old: string,
+    flag: number,
+    aname: string | null
 }
 
 export interface IProcMountRes extends IProcMessage{
@@ -157,25 +164,37 @@ export interface IProcUnmountRes extends IProcMessage{
     type: MessageType.UNMOUNT_RES,
 }
 
-export interface IProcMkdir extends IProcMessage{
-    type: MessageType.MKDIR,
+export interface IProcRemove extends IProcMessage{
+    type: MessageType.REMOVE,
     path: string
 }
 
-export interface IProcMkdirRes extends IProcMessage{
-    type: MessageType.MKDIR_RES
+export interface IProcRemoveRes extends IProcMessage{
+    type: MessageType.REMOVE_RES
 }
 
-export interface IProcRmdir extends IProcMessage{
-    type: MessageType.RMDIR,
-    path: string
+export interface IProcPipe extends IProcMessage{
+    type: MessageType.PIPE,
 }
 
-export interface IProcRmdirRes extends IProcMessage{
-    type: MessageType.RMDIR_RES
+export interface IProcPipeRes extends IProcMessage{
+    type: MessageType.PIPE_RES
+    fds: FileDescriptor[]
+}
+
+export interface IProcBind extends IProcMessage{
+    type: MessageType.BIND
+    name: string,
+    old: string,
+    flags: MountType
+}
+
+export interface IProcBindRes extends IProcMessage{
+    type: MessageType.BIND_RES
 }
 
 export interface IProcError extends IProcMessage{
     type: MessageType.ERROR,
     code: Status
 }
+

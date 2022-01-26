@@ -12,7 +12,7 @@
     "compileexecs": "./node_modules/webpack/bin/webpack.js --config webpack.toolchain.js",
     "buildtoolchain": "yarn compiletoolchain && yarn run buildinitrd",
     "compiletoolchain": "yarn compilelibraries && yarn compileexecs",
-    "buildinitrd": "ts-node -T utils/buildimg.ts",
+    "buildinitrd": "mkdir -p dist/bin && ts-node -T utils/buildimg.ts",
     "compilelibraries": "./node_modules/webpack/bin/webpack.js --config webpack.libraries.js",
     "build": "yarn run buildworker && yarn run buildtoolchain && yarn run buildboot"
   },

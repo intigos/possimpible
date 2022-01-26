@@ -1,5 +1,5 @@
-import {Kernel} from "../kernel/kernel";
-import {IDeviceDescription, IDeviceTree} from "./devicetree";
+import {IDeviceDescription} from "./devicetree";
+import {System} from "../sys/system";
 
 export class VirtualMachine{
     private devices: IDeviceDescription[];
@@ -8,7 +8,7 @@ export class VirtualMachine{
         this.devices = ds;
     }
 
-    async boot(kernel: Kernel){
+    async boot(kernel: System){
         return await kernel.boot(this.devices);
     }
 }

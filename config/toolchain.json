@@ -10,6 +10,12 @@
     "mount",
     "umount",
     "mkdir",
-    "rmdir"
+    "rmdir",
+    "boot",
+    "memfs"
+  ],
+  "exclude": [
+    "boot",
+    "memfs"
   ]
 }

@@ -1,4 +1,4 @@
-import {FD_STDIN, FD_STDOUT, OpenOptions} from "../../../public/api";
+import {FD_STDIN, FD_STDOUT} from "../../../public/api";
 import {print, readline, wait} from "libts";
 
 setTimeout(async () => {

@@ -1,5 +1,4 @@
-import {FD_STDIN, FD_STDOUT, OpenOptions} from "../../../public/api";
-import {PError, Status} from "../../../public/status";
+import {FD_STDIN, FD_STDOUT, OpenMode, PError, Status} from "../../../public/api";
 
 export function print(s: string){
     self.proc.sys.write(FD_STDOUT, s.replaceAll("\n","\n\r"));
@@ -52,7 +51,7 @@ export async function entrypoint(entrypoint: (argv: string[]) => Promise<number>
 }
 
 export async function slurp(path: string): Promise<string>{
-    let fd = await self.proc.sys.open(path, OpenOptions.READ);
+    let fd = await self.proc.sys.open(path, OpenMode.READ);
     let content =  await self.proc.sys.read(fd, -1);
     await self.proc.sys.close(fd);
     return content

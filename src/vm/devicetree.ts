@@ -14,13 +14,6 @@ export function DeviceDetail<T extends IDeviceProperties>(id: string, properties
     }
 }
 
-export interface IDeviceTree {
-    id: string;
-    label?: string;
-    value?: any;
-    children?: IDeviceTree[];
-}
-
 export function discover(attach: IDeviceDescription[]): IDeviceDescription[]{
     return attach;
 }

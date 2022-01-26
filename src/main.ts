@@ -1,14 +1,14 @@
 import {Terminal} from "xterm";
 import {FitAddon} from "xterm-addon-fit";
 import * as XtermWebfont from 'xterm-webfont'
-
-import {Kernel} from "./kernel/kernel";
 import "xterm/css/xterm.css";
 
 // @ts-ignore
 import initrd from "&/initrd.img";
 import {DeviceDetail, discover} from "./vm/devicetree";
 import {VirtualMachine} from "./vm/vm";
+import {System} from "./sys/system";
+import {PError, Status} from "./public/api";
 
 
 class TerminalDevice{
@@ -78,11 +78,19 @@ window.onload = async () => setTimeout(async x => {
             write: (buf: string) => console.log(buf)
         }),
     ]));
+    try{
+        await vm.boot(new System({
+            serial: "/dev/serial",
+            root: "/dev/initrd0",
+            rootfs: "blob",
+            initrc: "/bin/init"
+        }));
+    }catch (e) {
+        if(e instanceof PError){
+            console.error("Caught " + Status[e.code])
+        }else{
+            console.error(e);
+        }
+    }
 
-    await vm.boot(new Kernel({
-        serial: "/dev/tty0",
-        root: "/dev/initrd0",
-        rootfs: "blob",
-        initrc: "/bin/init"
-    }));
 }, 100);

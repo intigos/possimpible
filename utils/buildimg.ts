@@ -2,13 +2,13 @@
 
 import {generateDynaLib, generatePEXF} from "./pld";
 import {
-    blob_add_to_parent,
-    blob_alloc_superblock, blob_data_alloc,
-    blob_dirent_alloc, blob_inode_alloc,
-    BlobINodeType,
-    IBlobINode,
-    IBlobSuperNode
-} from "../src/kernel/fs/blobfs/structs";
+    mem_add_to_parent,
+    mem_alloc_superblock, mem_data_alloc,
+    mem_dirent_alloc, mem_inode_alloc,
+    MemINodeType,
+    IMemINode,
+    IMemSuperNode
+} from "../src/sys/memfs/low";
 
 const fs = require("fs");
 
@@ -28,13 +28,13 @@ function getDependencies(art){
 }
 
 function makeINode(data: number|number[], name:string,
-                   parent: IBlobINode|undefined, type: BlobINodeType, sb: IBlobSuperNode): IBlobINode{
+                   parent: IMemINode|undefined, type: MemINodeType, sb: IMemSuperNode): IMemINode{
 
-    let bn = blob_inode_alloc(type, sb, data)
-    let de = blob_dirent_alloc(name, bn,sb)
+    let bn = mem_inode_alloc(type, sb, data)
+    let de = mem_dirent_alloc(name, bn,sb)
 
     if(parent)
-        blob_add_to_parent(parent, de, sb);
+        mem_add_to_parent(parent, de, sb);
 
     return bn;
 }
@@ -42,28 +42,27 @@ function mkdatablock(dataspace: string[], data: string): number{
     return dataspace.push(data) - 1
 }
 
-let sb = blob_alloc_superblock()
+let sb = mem_alloc_superblock()
 
-let root = makeINode([], "", undefined, BlobINodeType.DIRECTORY, sb)
-let bin = makeINode([], "bin", root, BlobINodeType.DIRECTORY, sb)
+let root = makeINode([], "", undefined, MemINodeType.DIRECTORY, sb)
+let bin = makeINode([], "bin", root, MemINodeType.DIRECTORY, sb)
 process.stdout.write("repack bins... \n");
 for (let binname of toolchainConfig.execs){
     console.log(binname);
-    makeINode(blob_data_alloc(generatePEXF(binname, `dist/toolchain/js/${binname}.js`, getDependencies(binname)), sb),
-              binname, bin, BlobINodeType.REGULAR, sb)
+    fs.writeFileSync("dist/bin/" + binname + ".img", generatePEXF(binname, `dist/toolchain/js/${binname}.js`, getDependencies(binname)));
+    if(binname in toolchainConfig.exclude){
+        continue;
+    }
+    makeINode(mem_data_alloc(fs.readFileSync("dist/bin/" + binname + ".img", ).toString(), sb),
+              binname, bin, MemINodeType.REGULAR, sb)
 }
-let lib = makeINode([], "lib", root, BlobINodeType.DIRECTORY, sb)
+let lib = makeINode([], "lib", root, MemINodeType.DIRECTORY, sb)
 process.stdout.write("repack libs... \n");
 for (let libname of toolchainConfig.libs){
     console.log(libname);
-    makeINode(blob_data_alloc(generateDynaLib(libname, `dist/libs/js/${libname}.js`, getDependencies(libname)), sb),
-              libname + ".dyna", lib, BlobINodeType.REGULAR, sb)
+    makeINode(mem_data_alloc(generateDynaLib(libname, `dist/libs/js/${libname}.js`, getDependencies(libname)), sb),
+              libname + ".dyna", lib, MemINodeType.REGULAR, sb)
 }
-
-let dev = makeINode([], "dev", root, BlobINodeType.DIRECTORY, sb)
-let proc = makeINode([], "proc", root, BlobINodeType.DIRECTORY, sb)
-let vvv = makeINode([], "var", root, BlobINodeType.DIRECTORY, sb)
-let tmp = makeINode([], "tmp", vvv, BlobINodeType.DIRECTORY, sb)
 process.stdout.write("building initrd... ");
 
 

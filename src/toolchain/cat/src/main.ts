@@ -1,5 +1,4 @@
-import {FD_STDIN, FD_STDOUT} from "../../../public/api";
-import {Status} from "../../../public/status";
+import {FD_STDIN, FD_STDOUT, Status} from "../../../public/api";
 
 let syscall = self.proc.sys;
 setTimeout(async () => {

@@ -1,7 +1,6 @@
-import {FD_STDIN, FD_STDOUT} from "../../../public/api";
+import {FD_STDIN, FD_STDOUT, PError, Status} from "../../../public/api";
 import stringToArgv from "string-to-argv";
 import {wait, exit as die, print} from "libts";
-import {PError, Status} from "../../../public/status";
 
 let syscall = self.proc.sys;
 
@@ -33,9 +32,9 @@ setTimeout(async () => {
                     path = argv[1];
                 }
                 let fd = await self.proc.sys.open(path, 0);
-                let dirents = await self.proc.sys.getdents(fd, -1)
-                for (let x of dirents) {
-                    print(x.name + "\n\r")
+                let dirents = await self.proc.sys.read(fd, -1)
+                for (let x of dirents.split("\n")) {
+                    print(x + "\n\r")
                 }
             }else if(cmd == "exit"){
                 await die(1);
