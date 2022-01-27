@@ -19,8 +19,12 @@ import lorch from "./proc/lorch/module";
 import pipe from "./dev/pipe";
 
 
-type ISystemOptions = Record<string, string>;
+export type ISystemOptions = Record<string, string>;
 
+/**
+ * This class is the kernel of the of Possimpable. It retains the links for all the subsystems, and is passed,
+ * and used by the subsystems to access each other.
+ */
 export class System{
     public vfs: VirtualFileSystem;
     private options: Partial<ISystemOptions>;

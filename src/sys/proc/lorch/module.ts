@@ -51,7 +51,6 @@ const containerOperations: IContainerOperations = {
             id: "",
             code: params.code,
             argv: params.argv,
-            dyna: params.dyna,
             type: MessageType.START,
         }
         container.status = ContainerStatus.RUNNING;

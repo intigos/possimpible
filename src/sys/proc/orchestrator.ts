@@ -1,4 +1,4 @@
-import {IDependency, IProcMessage, MessageType} from "../../shared/proc";
+import {IProcMessage, MessageType} from "../../shared/proc";
 import {v4 as UUID } from 'uuid';
 import {System} from "../system";
 
@@ -10,7 +10,7 @@ export enum ContainerStatus{
     STOPPED
 }
 
-interface IOrchestrator{
+export interface IOrchestrator{
     name: string
     getcontainer: () => Promise<IContainer>;
 }
@@ -18,7 +18,6 @@ interface IOrchestrator{
 export interface IRunParams{
     code: string;
     argv: string[];
-    dyna: IDependency[];
     listener: (message:IProcMessage, container: IContainer) => void;
 }
 

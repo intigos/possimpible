@@ -7,7 +7,7 @@ export interface ISystemModule{
     cleanup: () => void;
 }
 
-interface IActiveModules {
+export interface IActiveModules {
     module: ISystemModule;
 }
 

@@ -4,6 +4,7 @@ export type MessageID = string
 
 export enum MessageType{
     READY,
+    DEPENDENCY,
     START,
 
     READ = 10,
@@ -44,7 +45,8 @@ export interface IProcMessage{
     id: MessageID
 }
 
-export interface IDependency{
+export interface IProcDependency extends IProcMessage{
+    type: MessageType.DEPENDENCY,
     name:string,
     code:string
 }
@@ -52,8 +54,7 @@ export interface IDependency{
 export interface IProcStart extends IProcMessage{
     type: MessageType.START,
     code: string,
-    argv: string[],
-    dyna: IDependency[],
+    argv: string[]
 }
 
 export type FileDescriptor = number

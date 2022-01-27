@@ -4,12 +4,12 @@ import {System} from "../system";
 import {IDevice} from "../vfs/device";
 import {PError, Status} from "../../public/api";
 
-interface DriverMatch{
+export interface DriverMatch{
     compatible: string,
     data: any
 }
 
-interface Driver {
+export interface Driver {
     probe: (x: IDeviceDescription, match:DriverMatch) => void
     remove: (x: IDeviceDescription  ) => void
     driver: {

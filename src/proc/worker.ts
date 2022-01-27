@@ -1,9 +1,16 @@
+/**
+ * A worker sets up the {@link https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API | WebWorker} with the
+ * basic API and event handler to be used as process. This code is only used by the WebWorker, not by the kernel.
+ *
+ * @module worker
+ */
+
 import {
     FileDescriptor,
     IProcBind,
     IProcBindRes,
     IProcChCwd,
-    IProcClose, IProcCreate, IProcCreateRes,
+    IProcClose, IProcCreate, IProcCreateRes, IProcDependency,
     IProcDie,
     IProcError,
     IProcExec,
@@ -28,9 +35,23 @@ import {
 } from "../shared/proc";
 import {ISystemCalls, MountType, OpenMode, PError, Status} from "../public/api";
 
+/**
+ * An instance of {@link Process} is created at the start of the worker. This contains helper functions that construct
+ * the correct structures to send to the main kernel.
+ *
+ */
 export class Process{
+    /**
+     * Router containing the identification of each message negotiated with the kernel.
+     */
     private router = new Map<MessageID, (message: IProcMessage) => void>();
+    /**
+     * This process arguments
+     */
     public argv?: string[]
+    /**
+     * Syscalls available to the process
+     */
     public sys : ISystemCalls = {
         read: this.sys_read.bind(this),
         write: this.sys_write.bind(this),
@@ -62,18 +83,17 @@ export class Process{
 
     private handleMessage(handle: MessageEvent<IProcMessage>){
         let message = handle.data;
-        if (message.type >= MessageType.READ_RES){
-            if(this.router.has(message.id)){
+        if (message.type >= MessageType.READ_RES) {
+            if (this.router.has(message.id)) {
                 this.router.get(message.id)!.call(null, message);
                 this.router.delete(message.id);
             }
+        }else if(message.type == MessageType.DEPENDENCY){
+            let depMessage = message as IProcDependency;
+            console.log(eval(depMessage.code));
         }else if(message.type == MessageType.START){
             let startMsg = message as IProcStart;
             this.argv = startMsg.argv;
-            for (const dep of startMsg.dyna) {
-                (self as any)[dep.name] = null;
-                eval(dep.code);
-            }
             console.log(eval(startMsg.code));
         }
     }

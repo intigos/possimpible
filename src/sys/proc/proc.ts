@@ -1,12 +1,13 @@
 import {v4 as UUID} from 'uuid';
 import {
     FileDescriptor,
-    IDependency,
     IProcBind,
     IProcBindRes,
     IProcChCwd,
     IProcChCwdRes,
-    IProcClose, IProcCreate, IProcCreateRes,
+    IProcClose,
+    IProcCreate,
+    IProcCreateRes, IProcDependency,
     IProcError,
     IProcExec,
     IProcExecRes,
@@ -14,9 +15,11 @@ import {
     IProcMessage,
     IProcOpen,
     IProcOpenRes,
-    IProcPipe, IProcPipeRes,
+    IProcPipe,
+    IProcPipeRes,
     IProcRead,
-    IProcReadRes, IProcRemove,
+    IProcReadRes,
+    IProcRemove,
     IProcRemoveRes,
     IProcWrite,
     MessageType
@@ -29,15 +32,15 @@ import {System} from "../system";
 import {IChannel} from "../vfs/channel";
 import {INSProxy} from "../ns/ns";
 import {Lookup} from "../vfs/namei";
-import {OpenMode, PError, Status, Type} from "../../public/api";
+import {OpenMode, PError, Status} from "../../public/api";
 
 type pid = number;
 
-interface ITaskOperations {
+export interface ITaskOperations {
     getParent: (task: ITask) => ITask|null
 }
 
-enum ITaskStatus {
+export enum ITaskStatus {
     PENDING,
     RUNNGING,
     STOP
@@ -361,7 +364,7 @@ export class ProcessManager {
         }
     }
 
-    private async fetchDepCode(dep: string, task: IProtoTask): Promise<IDependency[]> {
+    public async loadDependency(dep: string, container:IContainer, task: IProtoTask) {
         let entry = await this.system.vfs.lookup(`/lib/${dep}.dyna`, task)!;
         let file = await this.system.vfs.open(entry, OpenMode.EXEC | OpenMode.READ);
         let content;
@@ -371,20 +374,19 @@ export class ProcessManager {
             throw new PError(Status.EINVAL);
         }
 
-        let result: IDependency[] = [];
         if (!content.startsWith("dynalib:")) {
-            // TODO
-            console.log("Wrong format")
+            throw new PError(Status.ENOEXEC);
         }
         let dynalibstruct: IDynaLib = JSON.parse(content.substring(8))
         for (let dep of dynalibstruct.dependencies) {
-            result = result.concat(await this.fetchDepCode(dep, task))
+            await this.loadDependency(dep, container, task);
         }
-        result.push({
-            name: dep,
-            code: dynalibstruct.code
-        });
-        return result;
+        container.operations.send(container, {
+            type: MessageType.DEPENDENCY,
+            id: "",
+            code: dynalibstruct.code,
+            name: dep
+        } as IProcDependency);
     }
 
     public chroot(task: IProtoTask, path: IPath){
@@ -440,13 +442,15 @@ export class ProcessManager {
             throw new PError(Status.ENOEXEC);
         }
         let pexfstruct: IPEXF = JSON.parse(content.substring(5));
-        let dyna: IDependency[] = []
-        for (let dep of pexfstruct.dependencies) {
-            dyna = dyna.concat(await this.fetchDepCode(dep, parent))
-        }
-        let pid = this.genID();
+
         let lorch = this.system.orchestrators.getOrchestrator("lorch")!;
         let container = await lorch.getcontainer();
+
+        for (let dep of pexfstruct.dependencies) {
+            await this.loadDependency(dep, container, parent)
+        }
+        let pid = this.genID();
+
         let waits: ((value: (string | PromiseLike<string>)) => void)[] = [];
         const task: ITask = {
             status: ITaskStatus.RUNNGING,
@@ -485,7 +489,6 @@ export class ProcessManager {
         container.operations.run(container, {
             code: pexfstruct.code,
             argv: [path].concat(argv),
-            dyna,
             listener: this.handleProcess.bind(this)
         });
 

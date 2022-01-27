@@ -9,7 +9,7 @@ export interface IMount {
     mountpoint: IChannel;
 }
 
-interface IMountEntry{
+export interface IMountEntry{
     ns: number;
     parent: IMountEntry|null;
     mount: IMount;
