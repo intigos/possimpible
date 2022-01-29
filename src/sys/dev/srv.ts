@@ -28,16 +28,16 @@ function srvcreate(dir: IChannel, c: IChannel, name: string, mode: number){
     }
     root.push(srv);
 }
-
-async function srvread(c: IChannel, count: number, offset: number){
+const te = new TextEncoder();
+async function srvread(c: IChannel, count: number, offset: number): Promise<Uint8Array>{
     if(c.type & Type.DIR){
-        return root.map(x => x.name).reduce((x,y) => x + "\n" + y) || "";
+        return te.encode(root.map(x => x.name).reduce((x,y) => x + "\n" + y) || "");
     }
     throw new PError(Status.EPERM);
 }
-
-async function srvwrite(c: IChannel, buf: string, offset: number){
-    let fd = parseInt(buf);
+const td = new TextDecoder();
+async function srvwrite(c: IChannel, buf: Uint8Array, offset: number){
+    let fd = parseInt(td.decode(buf));
 
     (c.map as Srv).c = (S.current as ITask).files.fileDescriptors[fd]?.channel;
 }

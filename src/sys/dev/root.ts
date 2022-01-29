@@ -11,11 +11,11 @@ import {Type} from "../../public/api";
 const bootdir: IDirtab[] = [
     {name: "boot", id:1, type:Type.FILE, l:0, mode: 0,
      read: async (c, count, offset) => {
-        return (await (await (await fetch(bootbin)).blob()).text());
+        return new Uint8Array(await (await (await fetch(bootbin)).blob()).arrayBuffer());
      }},
     {name: "memfs", id:1, type:Type.FILE, l:0, mode: 0,
      read: async (c, count, offset) => {
-        return (await (await (await fetch(memfs)).blob()).text());
+        return new Uint8Array(await (await (await fetch(memfs)).blob()).arrayBuffer());
     }},
 ];
 

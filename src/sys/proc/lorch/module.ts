@@ -3,7 +3,7 @@ import {ContainerStatus, IContainer, IContainerOperations} from "../orchestrator
 import {v4 as UUID} from 'uuid';
 // @ts-ignore
 import workerImage from '&/worker.img';
-import {IProcMessage, IProcStart, MessageType} from "../../../shared/proc";
+import {debug, MessageType, MPStart, peak} from "../../../shared/proc";
 import {System} from "../../system";
 import {ISystemModule} from "../../modules";
 
@@ -12,7 +12,7 @@ interface WorkerBucket{
     worker: Worker,
     container?: IContainer,
     resolve: (container: IContainer | PromiseLike<IContainer>) => void;
-    handler?: (message: IProcMessage, container: IContainer) => void;
+    handler?: (type: MessageType, message: Uint8Array, container: IContainer) => void;
 }
 const workers = new Map<string, WorkerBucket>();
 const DEBUG = true;
@@ -31,12 +31,6 @@ function init(system: System){
             }
             workers.set(id, buck)
             wrk.addEventListener("message", async ev => {
-                if(DEBUG){
-                    const x = JSON.parse(JSON.stringify(ev.data));
-                    delete x["id"];
-                    delete x["type"];
-                    console.log("rx " + MessageType[ev.data.type], x);
-                }
                 await handleMessage(ev, buck)
             });
         })
@@ -47,14 +41,8 @@ const containerOperations: IContainerOperations = {
     run:(container, params) =>{
         const buck = workers.get(container.id)!;
         buck.handler = params.listener;
-        const msg: IProcStart = {
-            id: "",
-            code: params.code,
-            argv: params.argv,
-            type: MessageType.START,
-        }
         container.status = ContainerStatus.RUNNING;
-        buck.worker.postMessage(msg)
+        buck.worker.postMessage(MPStart("", params.code, params.argv))
     },
     kill: container => {
         const buck = workers.get(container.id)!;
@@ -64,19 +52,15 @@ const containerOperations: IContainerOperations = {
     },
     send:(container, message) => {
         const buck = workers.get(container.id)!;
-        if(DEBUG){
-            const x = JSON.parse(JSON.stringify(message));
-            delete x["id"];
-            delete x["type"];
-            console.log("tx " + MessageType[message.type], x);
-        }
-        buck.worker.postMessage(message);
+        buck.worker.postMessage(message, [message.buffer]);
     }
 }
 
 
-async function handleMessage(message: MessageEvent<IProcMessage>, bucket: WorkerBucket) {
-    if (message.data.type == MessageType.READY) {
+async function handleMessage(message: MessageEvent<Uint8Array>, bucket: WorkerBucket) {
+    const [type, id] = peak(message.data);
+    console.log(debug(message.data));
+    if (type == MessageType.READY) {
         bucket.container = {
             id: bucket.id,
             status: ContainerStatus.WAITING,
@@ -85,7 +69,7 @@ async function handleMessage(message: MessageEvent<IProcMessage>, bucket: Worker
         bucket.resolve(bucket.container)
     } else {
         if (bucket.handler) {
-            await bucket.handler(message.data, bucket.container!);
+            await bucket.handler(type, message.data, bucket.container!);
         }
     }
 }

@@ -8,7 +8,7 @@ setTimeout(async () => {
     while (!exit) {
         let buf = await readline()
 
-        self.proc.sys.write(FD_STDOUT, "\n\r");
+        self.proc.sys.write(FD_STDOUT, new TextEncoder().encode("\n\r"));
         if (buf == "barney") {
             const pid = await syscall.exec("/bin/psh", [""]);
 

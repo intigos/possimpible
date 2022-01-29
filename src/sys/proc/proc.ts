@@ -1,29 +1,4 @@
 import {v4 as UUID} from 'uuid';
-import {
-    FileDescriptor,
-    IProcBind,
-    IProcBindRes,
-    IProcChCwd,
-    IProcChCwdRes,
-    IProcClose,
-    IProcCreate,
-    IProcCreateRes, IProcDependency,
-    IProcError,
-    IProcExec,
-    IProcExecRes,
-    IProcGetCwdRes,
-    IProcMessage,
-    IProcOpen,
-    IProcOpenRes,
-    IProcPipe,
-    IProcPipeRes,
-    IProcRead,
-    IProcReadRes,
-    IProcRemove,
-    IProcRemoveRes,
-    IProcWrite,
-    MessageType
-} from "../../shared/proc";
 import {IContainer} from "./orchestrator";
 import {IDynaLib, IPEXF} from "../../shared/pexf";
 // import {IProcFSEntry, procCreate, procMkdir, procRemove} from "../fs/procfs/module";
@@ -33,6 +8,15 @@ import {IChannel} from "../vfs/channel";
 import {INSProxy} from "../ns/ns";
 import {Lookup} from "../vfs/namei";
 import {OpenMode, PError, Status} from "../../public/api";
+import {
+    FileDescriptor,
+    MessageType, MPBindRes, MPChCwdRes, MPClose, MPCloseRes, MPCreateRes,
+    MPDependency, MPError, MPExecRes, MPGetCwdRes, MPOpenRes, MPPipeRes,
+    MPReadRes, MPRemoveRes, MPWriteRes, MUBind, MUChCwd, MUClose, MUCreate, MUExec,
+    MUGetCwd, MUOpen, MUPipe,
+    MURead, MURemove,
+    MUWrite, peak
+} from "../../shared/proc";
 
 type pid = number;
 
@@ -117,18 +101,19 @@ export class ProcessManager {
         return null
     }
 
-    async handleProcess(message: IProcMessage, container: IContainer) {
+    async handleProcess(type: MessageType, message: Uint8Array, container: IContainer) {
         const process = this.containers.get(container.id)!;
         this.system.current = process.task;
         try{
-            switch (message.type) {
+            switch (type) {
                 case MessageType.WRITE: {
-                    let write = message as IProcWrite;
-                    const file = process.task.files.fileDescriptors[write.fd];
+                    let [id, fd, buf] = MUWrite(message);
+                    const file = process.task.files.fileDescriptors[fd];
                     if (file) {
                         const channel = file.channel;
                         if (channel.operations.write) {
-                            await channel.operations.write(channel, write.buf, file.position);
+                            await channel.operations.write(channel, buf, file.position);
+                            container.operations.send(container, MPWriteRes(id, 0))
                         } else {
                             throw new PError(Status.EPERM);
                         }
@@ -138,103 +123,79 @@ export class ProcessManager {
                     break;
                 }
                 case MessageType.READ: {
-                    let read = message as IProcRead;
-                    const file = process.task.files.fileDescriptors[read.fd];
+                    let [id, fd, count] = MURead(message);
+                    const file = process.task.files.fileDescriptors[fd];
                     if (file) {
                         let buf;
                         const channel = file.channel;
                         if(channel.operations.read){
-                            buf = await channel.operations.read(channel, read.count, file.position);
+                            buf = await channel.operations.read(channel, count, file.position);
                         }else{
                             throw new PError(Status.EINVAL);
                         }
-
-                        const res: IProcReadRes = {
-                            type: MessageType.READ_RES,
-                            id: message.id,
-                            buf
-                        }
-                        container.operations.send(container, res)
+                        container.operations.send(container, MPReadRes(id, buf))
                     } else {
                         throw new PError(Status.EBADFD);
                     }
                     break;
                 }
                 case MessageType.GETCWD: {
-                    const res: IProcGetCwdRes = {
-                        type: MessageType.GETCWD_RES,
-                        id: message.id,
-                        cwd: this.system.vfs.path(process.task.pwd, process.task)
-                    }
-                    container.operations.send(container, res)
+                    let [id] = MUGetCwd(message);
+                    container.operations.send(container, MPGetCwdRes(id, this.system.vfs.path(process.task.pwd, process.task)))
                     break;
                 }
 
                 case MessageType.OPEN: {
-                    let open = message as IProcOpen;
+                    let [id, path, mode] = MUOpen(message);
                     let cwd = process.task.pwd;
-                    let entry = await this.system.vfs.lookup(open.path, process.task)!;
-                    let file = await this.system.vfs.open(entry, 0);
+                    let entry = await this.system.vfs.lookup(path, process.task)!;
+                    let file = await this.system.vfs.open(entry, mode);
 
                     let fd = process.task.files.fileDescriptors.push(file) - 1;
-                    const res: IProcOpenRes = {
-                        type: MessageType.OPEN_RES,
-                        id: message.id,
-                        fd
-                    }
-                    container.operations.send(container, res)
+                    container.operations.send(container, MPOpenRes(id, fd))
                     break;
                 }
 
                 case MessageType.CREATE: {
-                    let create = message as IProcCreate;
+                    let [id, path, mode] = MUCreate(message);
                     const task = process.task;
                     let file: IFile;
 
-                    const nd = await this.system.vfs.namei.pathLookup(create.path, Lookup.PARENT, process.task);
-                    file = await this.system.vfs.create(nd.path, nd.last, create.mode);
+                    const nd = await this.system.vfs.namei.pathLookup(path, Lookup.PARENT, process.task);
+                    file = await this.system.vfs.create(nd.path, nd.last, mode);
 
                     let fd = process.task.files.fileDescriptors.push(file) - 1;
-                    const res: IProcCreateRes = {
-                        type: MessageType.CREATE_RES,
-                        id: message.id,
-                        fd
-                    }
-                    container.operations.send(container, res)
+                    container.operations.send(container, MPCreateRes(id, fd))
 
                     break;
                 }
 
 
                 case MessageType.CLOSE: {
-                    let close = message as IProcClose;
+                    let [id, fd] = MUClose(message);
                     if(!process.task.files.fileDescriptors){
                         throw new PError(Status.EBADFD);
                     }
-                    process.task.files.fileDescriptors[close.fd] = null;
+                    process.task.files.fileDescriptors[fd] = null;
+                    container.operations.send(container, MPCloseRes(id))
                     break;
                 }
 
                 case MessageType.BIND: {
-                    let mount = message as IProcBind;
+                    let [id, name, old, flags] = MUBind(message);
                     let cwd = process.task.pwd;
-                    const mountpoint = await this.system.vfs.lookup(mount.old, process.task)!;
+                    const mountpoint = await this.system.vfs.lookup(old, process.task)!;
                     let dev: IChannel;
 
-                    if (mount.name[0] == "#"){
-                        dev = await this.system.dev.getDevice(mount.name.substring(1)).operations.attach!("", this.system)
+                    if (name[0] == "#"){
+                        dev = await this.system.dev.getDevice(name.substring(1)).operations.attach!("", this.system)
                     }else{
-                        const path = await this.system.vfs.lookup(mount.name, process.task);
+                        const path = await this.system.vfs.lookup(name, process.task);
                         dev = path.entry;
                     }
 
-                    await this.system.vfs.cmount(dev, mountpoint.entry, mount.flags, mountpoint.mount, this.system.current.ns.mnt)
-
-                    const res: IProcBindRes = {
-                        type: MessageType.BIND_RES,
-                        id: message.id,
-                    }
-                    container.operations.send(container, res)
+                    await this.system.vfs.cmount(dev, mountpoint.entry, flags, mountpoint.mount, this.system.current.ns.mnt)
+                    container.operations.send(container, MPBindRes(id))
                     break;
                 }
 
@@ -268,15 +229,9 @@ export class ProcessManager {
                 // }
 
                 case MessageType.EXEC: {
-                    let exec = message as IProcExec;
-                    let task = await this.createProcess(exec.path, exec.argv, process.task);
-
-                    const res: IProcExecRes = {
-                        type: MessageType.EXEC_RES,
-                        id: message.id,
-                        pid: task.pid
-                    }
-                    container.operations.send(container, res)
+                    let [id, path, argv] = MUExec(message);
+                    let task = await this.createProcess(path, argv, process.task);
+                    container.operations.send(container, MPExecRes(id, task.pid))
                     break;
                 }
 
@@ -294,16 +249,12 @@ export class ProcessManager {
                 // }
 
                 case MessageType.CHCWD: {
-                    let chcwd = message as IProcChCwd;
+                    let [id, path] = MUChCwd(message);
                     let task = process.task;
 
-                    const path = await this.system.vfs.lookup(chcwd.path, process.task)!;
-                    this.chcwd(task, path);
-                    const res: IProcChCwdRes = {
-                        type: MessageType.CHCWD_RES,
-                        id: message.id
-                    }
-                    container.operations.send(container, res)
+                    const p = await this.system.vfs.lookup(path, process.task)!;
+                    this.chcwd(task, p);
+                    container.operations.send(container, MPChCwdRes(id))
                     break;
                 }
 
@@ -313,26 +264,21 @@ export class ProcessManager {
                 }
 
                 case MessageType.REMOVE: {
-                    let remove = message as IProcRemove;
+                    let [id, path] = MURemove(message);
                     let task = process.task;
 
-                    let entry = await this.system.vfs.lookup(remove.path, task)!;
+                    let entry = await this.system.vfs.lookup(path, task)!;
                     if(entry.entry.operations.remove){
                         await entry.entry.operations.remove(entry.entry)
                     }else{
                         throw new PError(Status.EPERM);
                     }
-
-                    const res: IProcRemoveRes = {
-                        type: MessageType.REMOVE_RES,
-                        id: message.id
-                    }
-                    container.operations.send(container, res)
+                    container.operations.send(container, MPRemoveRes(id))
                     break;
                 }
 
                 case MessageType.PIPE: {
-                    let pipe = message as IProcPipe;
+                    let [id] = MUPipe(message);
                     let task = process.task;
 
                     const dev = await this.system.dev.getDevice("|").operations.attach?.("", this.system)
@@ -342,24 +288,14 @@ export class ProcessManager {
                     const file1 = await this.system.vfs.open(data1, OpenMode.WRITE);
                     const pipefd = [this.openFile(task, file), this.openFile(task, file1)]
 
-
-                    const res: IProcPipeRes = {
-                        type: MessageType.PIPE_RES,
-                        id: message.id,
-                        fds: pipefd
-                    }
-                    container.operations.send(container, res)
+                    container.operations.send(container, MPPipeRes(id, pipefd))
                     break;
                 }
             }
         }catch (e) {
             if(e instanceof PError){
-                const error: IProcError = {
-                    type: MessageType.ERROR,
-                    id: message.id,
-                    code: e.code,
-                }
-                container.operations.send(container, error);
+                let [_, id] = peak(message);
+                container.operations.send(container, MPError(id, e.code));
             }
         }
     }
@@ -367,9 +303,9 @@ export class ProcessManager {
     public async loadDependency(dep: string, container:IContainer, task: IProtoTask) {
         let entry = await this.system.vfs.lookup(`/lib/${dep}.dyna`, task)!;
         let file = await this.system.vfs.open(entry, OpenMode.EXEC | OpenMode.READ);
-        let content;
+        let content: string;
         if(file.channel.operations.read){
-            content = await file.channel.operations.read(file.channel, -1, 0);
+            content = this.system.decoder.decode(await file.channel.operations.read(file.channel, -1, 0));
         }else{
             throw new PError(Status.EINVAL);
         }
@@ -381,12 +317,8 @@ export class ProcessManager {
         for (let dep of dynalibstruct.dependencies) {
             await this.loadDependency(dep, container, task);
         }
-        container.operations.send(container, {
-            type: MessageType.DEPENDENCY,
-            id: "",
-            code: dynalibstruct.code,
-            name: dep
-        } as IProcDependency);
+        container.operations.send(container, MPDependency("", dep, dynalibstruct.code));
+
     }
 
     public chroot(task: IProtoTask, path: IPath){
@@ -431,9 +363,9 @@ export class ProcessManager {
     async createProcess(path: string, argv: string[], parent: IProtoTask): Promise<ITask> {
         let entry = await this.system.vfs.lookup(path, parent)!;
         let file = await this.system.vfs.open(entry, OpenMode.EXEC | OpenMode.READ);
-        let content;
+        let content: string;
         if(file.channel.operations.read){
-            content = await file.channel.operations.read!(file.channel, -1, 0);
+            content = this.system.decoder.decode(await file.channel.operations.read!(file.channel, -1, 0));
         }else{
             throw new PError(Status.EINVAL);
         }

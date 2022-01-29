@@ -5,35 +5,19 @@
  * @module worker
  */
 
+import {CreateMode, ISystemCalls, MountType, OpenMode, PError, Status} from "../public/api";
 import {
+    debug,
     FileDescriptor,
-    IProcBind,
-    IProcBindRes,
-    IProcChCwd,
-    IProcClose, IProcCreate, IProcCreateRes, IProcDependency,
-    IProcDie,
-    IProcError,
-    IProcExec,
-    IProcExecRes,
-    IProcGetCwd,
-    IProcGetCwdRes,
-    IProcMessage,
-    IProcMount,
-    IProcMountRes,
-    IProcOpen,
-    IProcOpenRes, IProcPipe, IProcPipeRes,
-    IProcRead,
-    IProcReadRes,
-    IProcRemove,
-    IProcRemoveRes,
-    IProcStart,
-    IProcUnmount,
-    IProcWrite,
-    IProcWriteRes,
     MessageID,
-    MessageType,
+    MessageType, MPBind, MPChCwd, MPClose, MPCreate, MPDie, MPExec, MPGetCwd, MPMount, MPOpen, MPPipe,
+    MPRead, MPReady, MPRemove, MPUnmount, MPWrite, MUCreateRes,
+    MUDependency,
+    MUError, MUExecRes, MUGetCwdRes, MUOpenRes, MUPipeRes,
+    MUReadRes, MURemoveRes,
+    MUStart, MUWrite, MUWriteRes,
+    peak
 } from "../shared/proc";
-import {ISystemCalls, MountType, OpenMode, PError, Status} from "../public/api";
 
 /**
  * An instance of {@link Process} is created at the start of the worker. This contains helper functions that construct
@@ -44,7 +28,7 @@ export class Process{
     /**
      * Router containing the identification of each message negotiated with the kernel.
      */
-    private router = new Map<MessageID, (message: IProcMessage) => void>();
+    private router = new Map<MessageID, (message: Uint8Array) => void>();
     /**
      * This process arguments
      */
@@ -78,208 +62,117 @@ export class Process{
 
     constructor() {
         self.addEventListener("message", ev => this.handleMessage(ev));
-        self.postMessage({type: MessageType.READY, id:this.uuidv4()})
+        self.postMessage(MPReady(this.uuidv4()))
     }
 
-    private handleMessage(handle: MessageEvent<IProcMessage>){
+    private handleMessage(handle: MessageEvent<Uint8Array>){
         let message = handle.data;
-        if (message.type >= MessageType.READ_RES) {
-            if (this.router.has(message.id)) {
-                this.router.get(message.id)!.call(null, message);
-                this.router.delete(message.id);
+        const [type, id] = peak(message);
+        console.log(debug(handle.data));
+        if (type >= MessageType.READ_RES) {
+            if (this.router.has(id)) {
+                this.router.get(id)!.call(null, message);
+                this.router.delete(id);
             }
-        }else if(message.type == MessageType.DEPENDENCY){
-            let depMessage = message as IProcDependency;
-            console.log(eval(depMessage.code));
-        }else if(message.type == MessageType.START){
-            let startMsg = message as IProcStart;
-            this.argv = startMsg.argv;
-            console.log(eval(startMsg.code));
+        }else if(type == MessageType.DEPENDENCY){
+            let [_, name, code] = MUDependency(message)
+            eval(code);
+        }else if(type == MessageType.START){
+            let [_, code, argv] = MUStart(message)
+            this.argv = argv;
+            eval(code);
         }
     }
 
-    private call(message: IProcMessage){
-        self.postMessage(message);
+    private call(message: Uint8Array){
+        self.postMessage(message, [message.buffer]);
     }
 
-    private callWithPromise(message: IProcMessage) : Promise<IProcMessage>{
-        return new Promise<IProcMessage>((resolve, reject) => {
-            this.router.set(message.id, response => {
-                this.router.delete(message.id);
-                if (response.type != MessageType.ERROR){
+    private callWithPromise(message: Uint8Array) : Promise<Uint8Array>{
+        const [type, id] = peak(message);
+        return new Promise<Uint8Array>((resolve, reject) => {
+            this.router.set(id, response => {
+                this.router.delete(id);
+                if (type != MessageType.ERROR){
                     resolve(response);
                 }else{
-                    let res = response as IProcError
-                    reject(new PError(res.code))
+                    let [_, status] = MUError(message);
+                    reject(new PError(status))
                 }
             });
-            self.postMessage(message);
+            self.postMessage(message, [message.buffer]);
         })
     }
 
-    private async sys_read(fd: FileDescriptor, count: number) : Promise<string>{
-        const param: IProcRead = {
-            type: MessageType.READ,
-            id: this.uuidv4(),
-            fd: fd,
-            count: count
-        };
-        const res = await this.callWithPromise(param) as IProcReadRes;
-
-        return res.buf;
+    private async sys_read(fd: FileDescriptor, count: number) : Promise<Uint8Array>{
+        const res = await this.callWithPromise(MPRead(this.uuidv4(), fd, count));
+        const [_, buf] = MUReadRes(res);
+        return buf;
     }
 
-    private async sys_write(fd: FileDescriptor, buf: string) {
-        const param: IProcWrite = {
-            type: MessageType.WRITE,
-            id: this.uuidv4(),
-            buf: buf,
-            fd: fd,
-        }
-
-        const res = await this.callWithPromise(param) as IProcWriteRes;
+    private async sys_write(fd: FileDescriptor, buf: Uint8Array) : Promise<number>{
+        const res = await this.callWithPromise(MPWrite(this.uuidv4(), fd, buf));
+        const [_, count] = MUWriteRes(res);
+        return count;
     }
 
     private async sys_open(path: string, flags: OpenMode): Promise<FileDescriptor>{
-        const param: IProcOpen = {
-            type: MessageType.OPEN,
-            id: this.uuidv4(),
-            path: path,
-            flags: flags
-        };
-        const res = await this.callWithPromise(param) as IProcOpenRes;
-
-        return res.fd;
+        const res = await this.callWithPromise(MPOpen(this.uuidv4(), path, flags));
+        const [_, fd] = MUOpenRes(res);
+        return fd;
     }
 
-    private sys_close(fd: FileDescriptor){
-        const param: IProcClose = {
-            type: MessageType.CLOSE,
-            id: this.uuidv4(),
-            fd: fd
-        };
-
-        this.call(param);
+    private async sys_close(fd: FileDescriptor) {
+        await this.callWithPromise(MPClose(this.uuidv4(), fd));
     }
 
     private async sys_remove(path: string) : Promise<void>{
-        const param: IProcRemove = {
-            type: MessageType.REMOVE,
-            id: this.uuidv4(),
-            path: path
-        };
-        const res = await this.callWithPromise(param) as IProcRemoveRes;
-
+        const res = await this.callWithPromise(MPRemove(this.uuidv4(), path));
+        const [_, ] = MURemoveRes(res);
         return;
     }
 
     private async sys_getcwd() : Promise<string>{
-        const param: IProcGetCwd = {
-            type: MessageType.GETCWD,
-            id: this.uuidv4()
-        };
-        const res = await this.callWithPromise(param) as IProcGetCwdRes;
-
-        return res.cwd;
+        const res = await this.callWithPromise(MPGetCwd(this.uuidv4()));
+        const [_, path] = MUGetCwdRes(res);
+        return path;
     }
 
     private async sys_exec(path: string, argv:string[]) : Promise<number>{
-        const param: IProcExec = {
-            type: MessageType.EXEC,
-            id: this.uuidv4(),
-            path: path,
-            argv: argv
-        };
-        const res = await this.callWithPromise(param) as IProcExecRes;
-
-        return res.pid;
+        const res = await this.callWithPromise(MPExec(this.uuidv4(), path, argv));
+        const [_, pid] = MUExecRes(res);
+        return pid;
     }
 
     private async sys_chcwd(path: string){
-        const param: IProcChCwd = {
-            type: MessageType.CHCWD,
-            id: this.uuidv4(),
-            path: path
-        };
-        const res = await this.callWithPromise(param) as IProcExecRes;
-        return
+        await this.callWithPromise(MPChCwd(this.uuidv4(), path));
     }
 
-    private async sys_die(number: Status){
-        const param: IProcDie = {
-            type: MessageType.DIE,
-            id: this.uuidv4(),
-            status: number
-        };
-
-        // wait to block
-        const res = await this.callWithPromise(param) as IProcExecRes;
-        return
+    private async sys_die(status: Status){
+        await this.callWithPromise(MPDie(this.uuidv4(), status));
     }
 
-    private async sys_mount(fd: FileDescriptor, afd: FileDescriptor|null, old: string, flags?:number, aname?: string){
-        const param: IProcMount = {
-            fd: fd,
-            afd: afd,
-            old: old,
-            flag: flags || MountType.REPL,
-            aname: aname || null,
-            type: MessageType.MOUNT,
-            id: this.uuidv4(),
-        };
-
-        // wait to block
-        const res = await this.callWithPromise(param) as IProcMountRes;
-        return
+    private async sys_mount(fd: FileDescriptor, afd: FileDescriptor|null, old: string, flags?:MountType, aname?: string){
+        await this.callWithPromise(MPMount(this.uuidv4(), fd, afd || -1, old, aname || "", flags||0));
     }
 
     private async sys_bind(name: string, old: string, flags?: MountType){
-        const param: IProcBind = {
-            name: name,
-            old: old,
-            flags: flags || MountType.REPL,
-            type: MessageType.BIND,
-            id: this.uuidv4(),
-        };
-
-        // wait to block
-        const res = await this.callWithPromise(param) as IProcBindRes;
-        return
+        await this.callWithPromise(MPBind(this.uuidv4(), name, old, flags || 0));
     }
 
     private async sys_unmount(path:string){
-        const param: IProcUnmount = {
-            type: MessageType.UNMOUNT,
-            id: this.uuidv4(),
-            path: path,
-        };
-
-        // wait to block
-        const res = await this.callWithPromise(param) as IProcExecRes;
-        return
+        await this.callWithPromise(MPUnmount(this.uuidv4(), path));
     }
 
-    private async sys_create(path:string, mode: number): Promise<FileDescriptor>{
-        const param: IProcCreate = {
-            type: MessageType.CREATE,
-            id: this.uuidv4(),
-            path: path,
-            mode: mode
-        };
-
-        // wait to block
-        const res = await this.callWithPromise(param) as IProcCreateRes;
-        return res.fd;
+    private async sys_create(path:string, mode: CreateMode): Promise<FileDescriptor>{
+       const res = await this.callWithPromise(MPCreate(this.uuidv4(), path, mode));
+       const [_, fd] = MUCreateRes(res);
+       return fd;
     }
 
     private async sys_pipe(): Promise<FileDescriptor[]>{
-        const param: IProcPipe = {
-            type: MessageType.PIPE,
-            id: this.uuidv4(),
-        };
-
-        // wait to block
-        const res = await this.callWithPromise(param) as IProcPipeRes;
-        return res.fds;
+        const res = await this.callWithPromise(MPPipe(this.uuidv4()));
+        const [_, pipefd] = MUPipeRes(res);
+        return pipefd;
     }
 }

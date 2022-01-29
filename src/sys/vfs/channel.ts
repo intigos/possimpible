@@ -26,8 +26,8 @@ export interface IOperations {
     getstat: (c: IChannel) => Promise<IStat>;
     setattr: (c: IChannel, name: string, attr: string) => void;
     getattr: (c: IChannel, name: string) => Promise<string>
-    read: (c: IChannel, count: number, offset: number) => Promise<string>;
-    write: (c: IChannel, buf: string, offset: number) => void;
+    read: (c: IChannel, count: number, offset: number) => Promise<Uint8Array>;
+    write: (c: IChannel, buf: Uint8Array, offset: number) => void;
     walk: (dir: IChannel, c: IChannel, name: string) => void;
 }
 

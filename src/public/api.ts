@@ -175,8 +175,8 @@ export class PError {
 }
 
 export interface ISystemCalls {
-    read: (fd: FileDescriptor, count: number) => Promise<string>,
-    write: (fd: FileDescriptor, buf: string) => void,
+    read: (fd: FileDescriptor, count: number) => Promise<Uint8Array>,
+    write: (fd: FileDescriptor, buf: Uint8Array) => void,
     open: (path: string, flags: OpenMode) => Promise<FileDescriptor>,
     create: (path: string, mode: CreateMode) => Promise<FileDescriptor>,
     remove: (path: string) => void,

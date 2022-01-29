@@ -9,8 +9,7 @@ setTimeout(async () => {
 
     const pipefd = await syscall.pipe();
 
-    syscall.write(srvfd, "" + pipefd[0]);
-
+    syscall.write(srvfd, new TextEncoder().encode("" + pipefd[0]));
     do{
         const r = await syscall.read(pipefd[1], -1);
         syscall.write(1, r);

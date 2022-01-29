@@ -18,11 +18,11 @@ export interface IOrchestrator{
 export interface IRunParams{
     code: string;
     argv: string[];
-    listener: (message:IProcMessage, container: IContainer) => void;
+    listener: (type:MessageType, message:Uint8Array, container: IContainer) => void;
 }
 
 export interface IContainerOperations {
-    send: (container: IContainer, message:IProcMessage) => void,
+    send: (container: IContainer, message:Uint8Array) => void,
     run: (container: IContainer, params: IRunParams) => void
     kill: (container: IContainer) => void
 }

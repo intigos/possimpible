@@ -4,6 +4,8 @@ import {wait, exit as die, print} from "libts";
 
 let syscall = self.proc.sys;
 
+const te = new TextEncoder();
+const td = new TextDecoder()
 setTimeout(async () => {
     let cwd = await syscall.getcwd();
     const exit = false;
@@ -11,7 +13,7 @@ setTimeout(async () => {
     print("psh \n\r\n\r")
     print(cwd + " $ ")
     while (!exit) {
-        let char = await self.proc.sys.read(FD_STDIN, 1);
+        let char = td.decode(await self.proc.sys.read(FD_STDIN, 1));
         if(char.charCodeAt(0) == 127){
             print("\b \b")
             buf = buf.slice(0, -1);
@@ -32,7 +34,7 @@ setTimeout(async () => {
                     path = argv[1];
                 }
                 let fd = await self.proc.sys.open(path, 0);
-                let dirents = await self.proc.sys.read(fd, -1)
+                let dirents = td.decode(await self.proc.sys.read(fd, -1))
                 for (let x of dirents.split("\n")) {
                     print(x + "\n\r")
                 }

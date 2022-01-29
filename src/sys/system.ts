@@ -35,6 +35,8 @@ export class System{
     public orchestrators: OrchestratorManager;
     public ns: NamespaceManager;
     public proc: ProcessManager;
+    public encoder = new TextEncoder();
+    public decoder = new TextDecoder();
 
     public current?: IProtoTask;
     private console?: IFile;
@@ -85,7 +87,7 @@ export class System{
     }
 
     printk(data: string){
-        this.console?.channel.operations.write!(this.console?.channel, data.replace("\n", "\n\r"), -1);
+        this.console?.channel.operations.write!(this.console?.channel, this.encoder.encode(data.replace("\n", "\n\r")), -1);
     }
 
     panic(data: string){

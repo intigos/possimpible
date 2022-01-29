@@ -56,16 +56,17 @@ export const readdir = async (c: IChannel): Promise<IDirectoryEntry[]> => {
     throw new PError(Status.ENOTDIR);
 }
 
-export const read = async (c: IChannel, count: number, offset: number): Promise<string> => {
+const te = new TextEncoder();
+export const read = async (c: IChannel, count: number, offset: number): Promise<Uint8Array> => {
     if(c.type & Type.DIR){
         const {sb, root} = c.map as {sb: IMemSuperNode, root: IMemINode};
 
-        return sb.data[root.map as number]!;
+        return te.encode(sb.data[root.map as number]!);
     }else{
         const {sb, root} = c.map as {sb: IMemSuperNode, root: IMemINode};
         if (root.type == MemINodeType.DIRECTORY) {
-            return (root.map as MemDirEnt_ptr[]).map(x => {return sb.dirents[x]!.name})
-                .reduce((x, y) =>  x + "\n" + y) || "";
+            return te.encode((root.map as MemDirEnt_ptr[]).map(x => {return sb.dirents[x]!.name})
+                .reduce((x, y) =>  x + "\n" + y) || "");
         }else{
             throw new PError(Status.ENOTDIR)
         }

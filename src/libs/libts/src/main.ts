@@ -9,13 +9,16 @@
 import {FD_STDIN, FD_STDOUT, OpenMode, PError, Status} from "../../../public/api";
 
 
+const te = new TextEncoder()
+const td = new TextDecoder();
+
 /**
  * Sends a string to {@link FD_STDIN}
  *
  * @param s  String to print
  */
 export function print(s: string){
-    self.proc.sys.write(FD_STDOUT, s.replaceAll("\n","\n\r"));
+    self.proc.sys.write(FD_STDOUT, te.encode(s.replaceAll("\n","\n\r")));
 }
 
 /**
@@ -36,19 +39,19 @@ export async function wait(pid: number) {
 export async function readline() : Promise<string>{
     let char, buf = "";
     while(true){
-        char = await self.proc.sys.read(FD_STDIN, 1);
+        char = td.decode(await self.proc.sys.read(FD_STDIN, 1));
         if (char.charCodeAt(0) == 127) {
-            self.proc.sys.write(FD_STDOUT, "\b \b");
+            self.proc.sys.write(FD_STDOUT, te.encode("\b \b"));
             buf = buf.slice(0, -1);
 
         } else {
-            self.proc.sys.write(FD_STDOUT, char);
+            self.proc.sys.write(FD_STDOUT, te.encode(char));
         }
 
         if(char != "\r"){
             buf += char;
         }else {
-            self.proc.sys.write(FD_STDOUT, "\n\r");
+            self.proc.sys.write(FD_STDOUT, te.encode("\n\r"));
             return buf;
         }
     }
@@ -93,5 +96,5 @@ export async function slurp(path: string): Promise<string>{
     let fd = await self.proc.sys.open(path, OpenMode.READ);
     let content =  await self.proc.sys.read(fd, -1);
     await self.proc.sys.close(fd);
-    return content
+    return td.decode(content);
 }
