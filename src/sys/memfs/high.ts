@@ -18,7 +18,7 @@ export function mksb(): IMemSuperNode{
 
     mem_inode_alloc(
         MemINodeType.DIRECTORY,
-        sb, []);
+        sb, null, []);
 
     return sb;
 }
@@ -30,7 +30,7 @@ export function getroot(sb: IMemSuperNode): IMemINode{
 export function mkdir(name: string, dirbn: IMemINode, sb: IMemSuperNode){
     const nbn = mem_inode_alloc(
         MemINodeType.DIRECTORY,
-        sb, []);
+        sb, dirbn.pos,[]);
 
     const de = mem_dirent_alloc(name, nbn, sb);
 
@@ -42,7 +42,7 @@ export function mkdir(name: string, dirbn: IMemINode, sb: IMemSuperNode){
 export function mkfile(name: string, dirbn: IMemINode, content:string, sb: IMemSuperNode){
     const nbn = mem_inode_alloc(
         MemINodeType.REGULAR,
-        sb, mem_data_alloc(content, sb));
+        sb, dirbn.pos, mem_data_alloc(content, sb));
 
     const de = mem_dirent_alloc(name, nbn, sb);
 

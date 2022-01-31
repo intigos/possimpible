@@ -32,6 +32,21 @@ export enum OpenMode {
     RCLOSE = 0x40,
 }
 
+export enum RForkMode{
+    RFNAMEG = 1,
+    RFENVG = 2,
+    RFFDG = 4,
+    RFNOTEG = 8,
+    RFPROC = 16,
+    RFMEM = 32,
+    RFNOWAIT = 64,
+    RFCNAMEG = 1024,
+    RFCENVG = 2048,
+    RFCFDG = 4096,
+    RFREND = 8192,
+    RFNOMNT = 16384,
+}
+
 export enum Status {
     OK,                //OK
     EPERM = 1,	        	//Operation not permitted

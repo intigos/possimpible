@@ -29,6 +29,7 @@ export function mem_alloc_superblock(): IMemSuperNode{
 export interface IMemINode{
     type: MemINodeType,
     pos: MemINode_ptr,
+    parent: MemINode_ptr|null,
     map: MemData_ptr|MemDirEnt_ptr[]
 }
 
@@ -44,11 +45,13 @@ export function mem_dirent_alloc(name: string, inode: IMemINode, sb: IMemSuperNo
 }
 
 export function mem_inode_alloc(type: MemINodeType, sb: IMemSuperNode,
+                                 parent: MemINode_ptr|null,
                                  content :MemData_ptr|MemDirEnt_ptr[]): IMemINode{
     const node: IMemINode = {
         type: type,
         pos: sb.nodes.length,
-        map: content
+        map: content,
+        parent: parent
     }
 
     sb.nodes.push(node)

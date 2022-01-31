@@ -11,9 +11,9 @@ import {OpenMode, PError, Status} from "../../public/api";
 import {
     FileDescriptor,
     MessageType, MPBindRes, MPChCwdRes, MPClose, MPCloseRes, MPCreateRes,
-    MPDependency, MPError, MPExecRes, MPGetCwdRes, MPOpenRes, MPPipeRes,
+    MPDependency, MPError, MPExecRes, MPGetCwdRes, MPMountRes, MPOpenRes, MPPipeRes,
     MPReadRes, MPRemoveRes, MPWriteRes, MUBind, MUChCwd, MUClose, MUCreate, MUExec,
-    MUGetCwd, MUOpen, MUPipe,
+    MUGetCwd, MUMount, MUOpen, MUPipe,
     MURead, MURemove,
     MUWrite, peak
 } from "../../shared/proc";
@@ -199,20 +199,21 @@ export class ProcessManager {
                     break;
                 }
 
-                // case MessageType.MOUNT: {
-                //     let mount = message as IProcMount;
-                //     let cwd = process.task.pwd;
-                //     const mountpoint = await this.system.vfs.lookup(mount.old, process.task)!;
-                //     this.system.vfs.cmount()
-                //     await this.system.vfs.mount(mount.device, mount.options, mountpoint.mount, mountpoint.entry, this.system.vfs.getFS(mount.fstype));
-                //
-                //     const res: IProcMountRes = {
-                //         type: MessageType.MOUNT_RES,
-                //         id: message.id,
-                //     }
-                //     container.operations.send(container, res)
-                //     break;
-                // }
+                case MessageType.MOUNT: {
+                    debugger;
+                    let [id, fd, afd, old, aname, flags] = MUMount(message)
+                    const mountpoint = await this.system.vfs.lookup(old, process.task)!;
+                    const file = process.task.files.fileDescriptors[fd];
+                    const afile = process.task.files.fileDescriptors[afd];
+                    const dev = await this.system.dev.getDevice("M").operations.attach!({
+                        fd: file?.channel,
+                        afd: afile?.channel,
+                        aname: aname
+                    }, this.system)
+                    await this.system.vfs.cmount(dev, mountpoint.entry, flags, mountpoint.mount, this.system.current.ns.mnt)
+                    container.operations.send(container, MPMountRes(id))
+                    break;
+                }
 
                 // case MessageType.UNMOUNT: {
                 //     let unmount = message as IProcUnmount;

@@ -12,7 +12,7 @@ function init(system: System){
             rootdir.push({
                 name: x.id, id:1, type:Type.FILE, l:0, mode: 0,
                 read: async (file, buf) => {
-                    return (x as any).properties.image
+                    return new Uint8Array(await (await (await fetch((x as any).properties.image)).blob()).arrayBuffer())
                 }
             });
         },

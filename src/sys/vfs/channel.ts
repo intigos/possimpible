@@ -16,7 +16,7 @@ export interface IChannel {
 }
 
 export interface IOperations {
-    attach: (options:string, system: System) => Promise<IChannel>;
+    attach: (options:any, system: System) => Promise<IChannel>;
     dettach: (c: IChannel) => void;
     open: (c: IChannel, mode: OpenMode) => Promise<IChannel>;
     close: (c: IChannel) => void;

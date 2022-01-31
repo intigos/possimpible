@@ -30,7 +30,7 @@ function getDependencies(art){
 function makeINode(data: number|number[], name:string,
                    parent: IMemINode|undefined, type: MemINodeType, sb: IMemSuperNode): IMemINode{
 
-    let bn = mem_inode_alloc(type, sb, data)
+    let bn = mem_inode_alloc(type, sb, parent?.pos || null, data)
     let de = mem_dirent_alloc(name, bn,sb)
 
     if(parent)

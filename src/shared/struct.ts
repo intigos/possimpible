@@ -18,7 +18,7 @@ export function packBytearray(s: Uint8Array){
 
 export function unpackBytearray(s:Uint8Array, p: number): Unpacked<Uint8Array>{
     const dv = new DataView(s.buffer)
-    const l = dv.getFloat64(p);
+    const l = dv.getFloat64(s.byteOffset + p);
     return [s.subarray(p + 8, p + 8 + l), p + 8 + l];
 }
 
@@ -34,7 +34,7 @@ export function packString(s:string): Uint8Array{
 
 export function unpackString(s:Uint8Array, p: number): Unpacked<string>{
     const dv = new DataView(s.buffer)
-    const l = dv.getFloat64(p);
+    const l = dv.getFloat64(s.byteOffset + p);
     return [decoder.decode(s.subarray(p + 8, p + 8 + l)), p + 8 + l];
 }
 
@@ -55,7 +55,7 @@ export function packA<T>(s:T[], packer:Packer<T>): Uint8Array{
 export function unpackA<T>(unpacker: Unpacker<T>): (s:Uint8Array, p: number) => Unpacked<T[]>{
     return (s:Uint8Array, p: number): Unpacked<T[]> => {
         const dv = new DataView(s.buffer);
-        const length = dv.getFloat64(p);
+        const length = dv.getFloat64(s.byteOffset + p);
         const result: T[] = []
         p += 8;
         for (let i=0; i<length; i++) {
@@ -75,7 +75,7 @@ export function packInt8(s:number){
 }
 
 export function unpackInt8(s:Uint8Array, p: number): Unpacked<number>{
-    return [new DataView(s.buffer).getInt8(p), p + 1];
+    return [new DataView(s.buffer).getInt8(s.byteOffset + p), p + 1];
 }
 
 export function packUInt8(s:number){
@@ -86,7 +86,18 @@ export function packUInt8(s:number){
 }
 
 export function unpackUInt8(s:Uint8Array, p: number): Unpacked<number>{
-    return [new DataView(s.buffer).getUint8(p), p + 1];
+    return [new DataView(s.buffer).getUint8(s.byteOffset + p), p + 1];
+}
+
+export function packUInt16(s:number){
+    const arr = new Uint8Array(2);
+    const dv = new DataView(arr.buffer);
+    dv.setUint16(0, s);
+    return arr;
+}
+
+export function unpackUInt16(s:Uint8Array, p: number): Unpacked<number>{
+    return [new DataView(s.buffer).getUint16(s.byteOffset + p), p + 2];
 }
 
 export function packInt32(s:number){
@@ -97,7 +108,7 @@ export function packInt32(s:number){
 }
 
 export function unpackInt32(s:Uint8Array, p: number): Unpacked<number>{
-    return [new DataView(s.buffer).getInt32(p), p + 4];
+    return [new DataView(s.buffer).getInt32(s.byteOffset + p), p + 4];
 }
 
 export function packUInt32(s:number){
@@ -108,7 +119,7 @@ export function packUInt32(s:number){
 }
 
 export function unpackUInt32(s:Uint8Array, p: number): Unpacked<number>{
-    return [new DataView(s.buffer).getUint32(p), p + 4];
+    return [new DataView(s.buffer).getUint32(s.byteOffset + p), p + 4];
 }
 
 export function packDouble(s:number){
@@ -119,7 +130,7 @@ export function packDouble(s:number){
 }
 
 export function unpackDouble(s:Uint8Array, p: number): Unpacked<number>{
-    return [new DataView(s.buffer).getFloat32(p), p + 8];
+    return [new DataView(s.buffer).getFloat32(s.byteOffset + p), p + 8];
 }
 
 export function pack(arrs: Uint8Array[]){

@@ -1,3 +1,5 @@
+import {MountType, OpenMode} from "../../../public/api";
+
 setTimeout(async () => {
     let syscall = self.proc.sys;
     const te = new TextEncoder();
@@ -13,13 +15,15 @@ setTimeout(async () => {
     await syscall.open("/dev/cons", 0);
     await syscall.open("/dev/cons", 0);
 
-    syscall.write(0, te.encode("Booting System...\n\r"));
+    syscall.write(0, te.encode("Booting System...\n\r\n\r"));
 
+    await syscall.write(0, te.encode("mounting root\n\r"));
     await syscall.exec("/boot/memfs", ["#💾/initrd0", "/srv/initrd"]);
 
     setTimeout(async x => {
-        const fd = await syscall.open("/srv/initrd", 0);
-        await syscall.write(fd, te.encode("DO IT\n\r"));
+        const fd = await syscall.open("/srv/initrd", OpenMode.RDWR)
+        await syscall.mount(fd, null, "/root", MountType.REPL);
+
     }, 100);
 
 },0);

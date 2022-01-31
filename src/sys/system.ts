@@ -17,6 +17,7 @@ import srv from "./dev/srv";
 import bootimg from "./dev/bootimg";
 import lorch from "./proc/lorch/module";
 import pipe from "./dev/pipe";
+import mount from "./dev/mount";
 
 
 export type ISystemOptions = Record<string, string>;
@@ -77,6 +78,7 @@ export class System{
         await this.mod.installModule(bootimg)
         await this.mod.installModule(lorch)
         await this.mod.installModule(pipe)
+        await this.mod.installModule(mount)
         this.descriptions = devices;
         await this.dev.init()
         await this.setupSystemTask();
