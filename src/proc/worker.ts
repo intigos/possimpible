@@ -12,11 +12,10 @@ import {
     MessageID,
     MessageType, MPBind, MPChCwd, MPClose, MPCreate, MPDie, MPExec, MPGetCwd, MPMount, MPOpen, MPPipe,
     MPRead, MPReady, MPRemove, MPUnmount, MPWrite, MUCreateRes,
-    MUDependency,
-    MUError, MUExecRes, MUGetCwdRes, MUOpenRes, MUPipeRes,
-    MUReadRes, MURemoveRes,
+    MUDependency, MUExecRes, MUGetCwdRes, MUOpenRes, MUPipeRes,
+    MUReadRes, MURemoveRes, MUSignal,
     MUStart, MUWrite, MUWriteRes,
-    peak
+    peak, Signal
 } from "../shared/proc";
 
 /**
@@ -52,6 +51,7 @@ export class Process{
         pipe: this.sys_pipe.bind(this),
         create: this.sys_create.bind(this)
     }
+    private callsites = new Map<string, (...args: any) => any>()
 
     private uuidv4() {
         return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -68,7 +68,6 @@ export class Process{
     private handleMessage(handle: MessageEvent<Uint8Array>){
         let message = handle.data;
         const [type, id] = peak(message);
-        console.log(debug(handle.data));
         if (type >= MessageType.READ_RES) {
             if (this.router.has(id)) {
                 this.router.get(id)!.call(null, message);
@@ -81,6 +80,8 @@ export class Process{
             let [_, code, argv] = MUStart(message)
             this.argv = argv;
             eval(code);
+            const cs = this.callsites.get("__start");
+            if(cs){ cs(argv); }
         }
     }
 
@@ -92,12 +93,15 @@ export class Process{
         const [type, id] = peak(message);
         return new Promise<Uint8Array>((resolve, reject) => {
             this.router.set(id, response => {
+                const [type, id] = peak(response);
                 this.router.delete(id);
-                if (type != MessageType.ERROR){
+                if (type != MessageType.SIGNAL){
                     resolve(response);
                 }else{
-                    let [_, status] = MUError(message);
-                    reject(new PError(status))
+                    let [_, signal, arg] = MUSignal(response);
+                    if(signal == Signal.ERROR){
+                        reject(new PError(arg))
+                    }
                 }
             });
             self.postMessage(message, [message.buffer]);
@@ -174,5 +178,9 @@ export class Process{
         const res = await this.callWithPromise(MPPipe(this.uuidv4()));
         const [_, pipefd] = MUPipeRes(res);
         return pipefd;
+    }
+
+    public async entrypoint(ep: (...args: any) => any, p?: string){
+        this.callsites.set(p ? p: "__start" , ep);
     }
 }

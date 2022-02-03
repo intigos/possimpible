@@ -1,9 +1,8 @@
 import {IDeviceDescription} from "../vm/devicetree";
 import {DeviceManager} from "./dev/dev";
 import {VirtualFileSystem} from "./vfs/vfs";
-import {IFile, IProtoTask, ProcessManager} from "./proc/proc";
+import {ProcessManager} from "./proc/proc";
 import {ModularityManager} from "./modules";
-import {OrchestratorManager} from "./proc/orchestrator";
 import {NamespaceManager} from "./ns/ns";
 import {mkchannel} from "./vfs/channel";
 
@@ -15,9 +14,10 @@ import {LogLevel, LogManager} from "./log";
 import {red, yellow} from "./colors";
 import srv from "./dev/srv";
 import bootimg from "./dev/bootimg";
-import lorch from "./proc/lorch/module";
 import pipe from "./dev/pipe";
 import mount from "./dev/mount";
+import {IFile, IProtoTask, Task} from "./proc/task";
+import cpu from "./dev/cpu";
 
 
 export type ISystemOptions = Record<string, string>;
@@ -33,7 +33,6 @@ export class System{
 
     public dev: DeviceManager;
     public mod: ModularityManager;
-    public orchestrators: OrchestratorManager;
     public ns: NamespaceManager;
     public proc: ProcessManager;
     public encoder = new TextEncoder();
@@ -50,7 +49,6 @@ export class System{
         this.dev = new DeviceManager(this);
         this.proc = new ProcessManager(this);
         this.mod = new ModularityManager(this);
-        this.orchestrators = new OrchestratorManager(this);
         this.ns = new NamespaceManager(this);
         this.log = new LogManager(this);
     }
@@ -59,13 +57,18 @@ export class System{
         const ns = this.ns.create(0, null);
 
         const root = await this.vfs.attach("/", "");
-        const mount = await this.vfs.cmount(root, mkchannel(), 0, null, ns.mnt);
+        let mount = await this.vfs.cmount(root, mkchannel(), 0, null, ns.mnt);
 
         this.ktask = {
-            root: {entry: root, mount: mount},
-            pwd: {entry: root, mount: mount},
+            root: {channel: root, mount: mount},
+            pwd: {channel: root, mount: mount},
             ns: ns,
         };
+
+        const cpu = await this.vfs.attach("C", "");
+        const dev = await this.vfs.lookup("/dev", this.ktask);
+        await this.vfs.cmount(cpu, dev.channel, 0, dev.mount, ns.mnt);
+
         this.current = this.ktask;
     }
 
@@ -76,16 +79,16 @@ export class System{
         await this.mod.installModule(srv)
         await this.mod.installModule(serial)
         await this.mod.installModule(bootimg)
-        await this.mod.installModule(lorch)
         await this.mod.installModule(pipe)
         await this.mod.installModule(mount)
+        await this.mod.installModule(cpu)
         this.descriptions = devices;
         await this.dev.init()
         await this.setupSystemTask();
 
-        await this.proc.createProcess("/boot/boot", [], this.current!);
+        const task = await this.proc.createFirstProcess("/boot/boot", [], this.current!, "/dev/cpu");
 
-        await this.proc.wait(1);
+        await this.proc.wait(1, task);
     }
 
     printk(data: string){

@@ -9,6 +9,7 @@ export interface IDirtab{
     mode: number,
     read?: IOperations["read"],
     write?: IOperations["write"]
+    remove?: IOperations["remove"]
     dirtab?: IDirtab[]
 }
 

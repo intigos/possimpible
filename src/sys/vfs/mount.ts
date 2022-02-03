@@ -123,16 +123,16 @@ export class MountManager{
 
     lookupMountpoint(mount: IMount): IPath|undefined{
         return {
-            entry: mount.mountpoint,
+            channel: mount.mountpoint,
             mount: mount.parent?.parent!
         }
     }
 
     lookup(path: IPath, ns: IMountNS): IPath|null {
         for (let pathElement of ns.mounts) {
-            if(pathElement.mount.mountpoint == path.entry && pathElement.parent?.mount == path.mount){
+            if(pathElement.mount.mountpoint == path.channel && pathElement.parent?.mount == path.mount){
                 return {
-                    entry: pathElement.mount.root,
+                    channel: pathElement.mount.root,
                     mount: pathElement.mount
                 };
             }

@@ -1,10 +1,10 @@
 import {IMount, IMountNS, MountManager} from "./mount";
 import {channelmounts, IChannel, mkchannel} from "./channel";
 import {Last, Lookup, NameI} from "./namei";
-import {IFile, IProtoTask} from "../proc/proc";
 import {IPath} from "./path";
 import {System} from "../system";
 import {OpenMode, PError, Status} from "../../public/api";
+import {IFile, IProtoTask} from "../proc/task";
 
 const DIV = "/"
 
@@ -30,7 +30,7 @@ export class VirtualFileSystem{
         if(!oldc.parent && parent){
             // might be a root of a mounted point
             let p = this.system.vfs.mounts.lookupMountpoint(parent);
-            oldc = p?.entry!
+            oldc = p?.channel!
             parent = p?.mount!
         }
 
@@ -56,14 +56,14 @@ export class VirtualFileSystem{
     }
 
     async open(path: IPath, mode: OpenMode): Promise<IFile>{
-        if(path.entry){
-            if(path.entry.operations.open) {
-                path.entry = await path.entry.operations.open(path.entry, mode)
+        if(path.channel){
+            if(path.channel.operations.open) {
+                path.channel = await path.channel.operations.open(path.channel, mode)
             }
 
             return {
                 position: 0,
-                channel: path.entry
+                channel: path.channel
             };
         }
 
@@ -74,13 +74,13 @@ export class VirtualFileSystem{
         let buf = "";
         let p: IPath|undefined = path;
         while(p){
-            let entry:any = p.entry;
+            let entry:any = p.channel;
             let mount = p.mount;
-            while(entry.parent != null && entry != task.root.entry){
+            while(entry.parent != null && entry != task.root.channel){
                 buf = "/" + entry.name + buf;
                 entry = entry.parent;
             }
-            if(entry != task.root.entry){
+            if(entry != task.root.channel){
                 p = this.system.vfs.mounts.lookupMountpoint(mount!);
             }else{
                 return buf.length ? buf : "/";
@@ -91,24 +91,24 @@ export class VirtualFileSystem{
 
     findRoot(path: IPath): IPath{
         let p: IPath|undefined = path;
-        let entry = p.entry;
+        let entry = p.channel;
         let mount = p.mount;
         while(p){
-            entry = p.entry;
+            entry = p.channel;
             mount = p.mount;
             while(entry.parent != null){
                 entry = entry.parent;
             }
             p = this.system.vfs.mounts.lookupMountpoint(mount!);
         }
-        return {mount:mount, entry:entry};
+        return {mount:mount, channel:entry};
     }
 
     async create(path: IPath, name:string, mode: number){
-        if (path.entry) {
-            if(path.entry.operations.create){
+        if (path.channel) {
+            if(path.channel.operations.create){
                 const c = mkchannel();
-                path.entry.operations.create(path.entry, c, name, mode);
+                path.channel.operations.create(path.channel, c, name, mode);
                 return {
                     position: 0,
                     channel: c

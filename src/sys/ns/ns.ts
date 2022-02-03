@@ -1,9 +1,11 @@
 import {System} from "../system";
 import {IMountNS} from "../vfs/mount";
+import {PidNS} from "../proc/pid";
 
 export interface INSProxy {
     parent: INSProxy|null,
     mnt: IMountNS,
+    pid: PidNS,
     children: INSProxy[]
 }
 
@@ -21,9 +23,11 @@ export class NamespaceManager{
 
     create(options: NSOp, ns: INSProxy|null): INSProxy {
         const mnt = this.system.vfs.mounts.createNS(ns?ns.mnt:null, (options & NSOp.CLONE_MOUNT) == NSOp.CLONE_MOUNT);
-        const result = {
+        const pid = this.system.proc.pids.createNS(null)
+        const result: INSProxy = {
             parent: ns,
             mnt,
+            pid,
             children: []
         };
         ns?.children.push(result);

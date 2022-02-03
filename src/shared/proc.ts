@@ -24,6 +24,7 @@ export enum MessageType {
     READY,
     DEPENDENCY,
     START,
+    FORK_START,
 
     READ = 10,
     WRITE,
@@ -55,7 +56,11 @@ export enum MessageType {
     UNMOUNT_RES,
     REMOVE_RES,
     PIPE_RES,
-    ERROR,
+    SIGNAL,
+}
+
+export enum Signal{
+    ERROR
 }
 
 export type FileDescriptor = number
@@ -64,12 +69,6 @@ export interface IProcMessage {
     type: MessageType
     id: MessageID
 }
-
-// export interface IProcDependency extends IProcMessage {
-//     type: MessageType.DEPENDENCY,
-//     name: string,
-//     code: string
-// }
 
 function unpackMessage(a:Uint8Array, pattern: any){
     const s = unpack(a, pattern);
@@ -116,6 +115,22 @@ export const MPStart = (id: MessageID, code: string, args: string[]) =>
 export const MUStart = (a: Uint8Array) =>
     unpackMessage(a, [unpackInt8, unpackString, unpackString, unpackA(unpackString)]) as [MessageID, string, string[]]
 
+export const MPForkStart = (id: MessageID, code: string, entrypoint:string, args: string[]) =>
+    pack([packInt8(MessageType.FORK_START), packString(id), packString(code), packString(entrypoint), packA(args, packString)])
+export const MUForkStart = (a: Uint8Array) =>
+    unpackMessage(a, [unpackInt8, unpackString, unpackString, unpackString, unpackA(unpackString)]) as [MessageID, string, string[]]
+
+export const MPFork = (id: MessageID, entrypoint:string, args: string[]) =>
+    pack([packInt8(MessageType.FORK), packString(id), packString(entrypoint), packA(args, packString)])
+export const MUFork = (a: Uint8Array) =>
+    unpackMessage(a, [unpackInt8, unpackString, unpackString, unpackA(unpackString)]) as [MessageID, string, string[]]
+
+export const MPForkRes = (id: MessageID, pid: number) =>
+    pack([packInt8(MessageType.FORK_RES), packString(id), packUInt32(pid)])
+export const MUForkRes = (a: Uint8Array) =>
+    unpackMessage(a, [unpackInt8, unpackUInt32]) as [MessageID, string, string[]]
+
+
 export const MPExec = (id: MessageID, code: string, args: string[]) =>
     pack([packInt8(MessageType.EXEC), packString(id), packString(code), packA(args, packString)])
 export const MUExec = (a: Uint8Array) =>
@@ -131,10 +146,10 @@ export const MPCreate = (id: MessageID, file: string, mode: CreateMode) =>
 export const MUCreate = (a: Uint8Array) =>
     unpackMessage(a, [unpackInt8, unpackString, unpackString, unpackDouble]) as [MessageID, string, CreateMode]
 
-export const MPError = (id: MessageID, status: Status) =>
-    pack([packInt8(MessageType.ERROR), packString(id), packUInt8(status)])
-export const MUError = (a: Uint8Array) =>
-    unpackMessage(a, [unpackInt8, unpackString, unpackUInt8]) as [MessageID, Status]
+export const MPSignal = (id: MessageID, signal: Signal, arg: number) =>
+    pack([packInt8(MessageType.SIGNAL), packString(id), packUInt8(signal), packUInt8(arg)])
+export const MUSignal = (a: Uint8Array) =>
+    unpackMessage(a, [unpackInt8, unpackString, unpackUInt8, unpackUInt8]) as [MessageID, Signal, number]
 
 export const MPWriteRes = (id: MessageID, count: number) =>
     pack([packInt8(MessageType.WRITE_RES), packString(id), packDouble(count)])
@@ -305,8 +320,8 @@ export function debug(a: Uint8Array){
         case MessageType.PIPE_RES:
             result = MUPipeRes(a);
             break;
-        case MessageType.ERROR:
-            result = MUError(a);
+        case MessageType.SIGNAL:
+            result = MUSignal(a);
             break;
     }
 

@@ -2,8 +2,8 @@ import {ISystemModule} from "../modules";
 import {System} from "../system";
 import {IChannel, mkchannel} from "../vfs/channel";
 import {IDirectoryEntry} from "../vfs/operations";
-import {ITask} from "../proc/proc";
 import {CreateMode, PError, Status, Type} from "../../public/api";
+import {Task} from "../proc/task";
 
 interface Srv {
     name: string,
@@ -39,7 +39,7 @@ const td = new TextDecoder();
 async function srvwrite(c: IChannel, buf: Uint8Array, offset: number){
     let fd = parseInt(td.decode(buf));
 
-    (c.map as Srv).c = (S.current as ITask).files.fileDescriptors[fd]?.channel;
+    (c.map as Srv).c = (S.current as Task).files.fileDescriptors[fd]?.channel;
 }
 
 async function srvopen(c: IChannel, mode: number): Promise<IChannel>{

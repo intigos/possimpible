@@ -32,7 +32,7 @@ export enum OpenMode {
     RCLOSE = 0x40,
 }
 
-export enum RForkMode{
+export enum ForkMode{
     RFNAMEG = 1,
     RFENVG = 2,
     RFFDG = 4,

@@ -2,6 +2,6 @@ import {IChannel} from "./channel";
 import {IMount} from "./mount";
 
 export interface IPath{
-    entry: IChannel;
+    channel: IChannel;
     mount: IMount|null;
 }

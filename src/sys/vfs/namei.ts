@@ -2,8 +2,8 @@ import {channel_get_cache, channel_set_cache, channelmounts, IChannel, mkchannel
 import {System} from "../system";
 import {IPath} from "./path";
 import {IMount, IMountNS} from "./mount";
-import {IProtoTask} from "../proc/proc";
 import {PError, Status} from "../../public/api";
+import {IProtoTask} from "../proc/task";
 
 export interface nameidata{
     ns: IMountNS;
@@ -65,43 +65,43 @@ export class NameI{
             flags: flags | Lookup.JUMPED,
             depth: 0,
             root: {
-                entry: task.root.entry,
+                channel: task.root.channel,
                 mount: task.root.mount
             },
             path: {
-                entry: task.pwd.entry,
+                channel: task.pwd.channel,
                 mount: task.pwd.mount
             }
         }
 
         if (flags & Lookup.ROOT) {
-            let inode = nd.root.entry;
+            let inode = nd.root.channel;
             if (name.length) {
                 if (!inode?.operations.walk) {
                     throw new PError(Status.ENOTDIR);
                 }
 
-                nd.path.entry = task.root.entry;
+                nd.path.channel = task.root.channel;
                 nd.path.mount = task.root.mount;
             }
         }
 
         switch (name[0]) {
             case '/':
-                nd.path.entry = task.root.entry;
+                nd.path.channel = task.root.channel;
                 nd.path.mount = task.root.mount;
                 break;
             default:
-                nd.path.entry = task.pwd.entry;
+                nd.path.channel = task.pwd.channel;
                 nd.path.mount = task.pwd.mount;
         }
 
         if(root){
-            nd.path.entry = root;
+            nd.path.channel = root;
             nd.path.mount = null;
         }
 
-        nd.channel = nd.path.entry!;
+        nd.channel = nd.path.channel!;
 
         return nd;
     }
@@ -160,7 +160,7 @@ export class NameI{
                     type = Last.DOT;
             }
             if (type == Last.NORM) {
-                let parent = nd.path.entry
+                let parent = nd.path.channel
                 nd.flags &= ~Lookup.JUMPED;
             }
 
@@ -198,21 +198,21 @@ export class NameI{
             return 0;
         }
         let parentpath = this.system.vfs.mounts.lookupMountpoint(path.mount!);
-        path.entry = parentpath?.entry!;
+        path.channel = parentpath?.channel!;
         path.mount = parentpath?.mount!;
         return 1;
     }
 
     follow_dotdot(nd: nameidata){
         while(1){
-            let od = nd.path.entry;
+            let od = nd.path.channel;
 
-            if(nd.path.entry == nd.root.entry &&
+            if(nd.path.channel == nd.root.channel &&
                 nd.path.mount == nd.root.mount){
                 break;
             }
-            if(nd.path.entry != nd.path.mount?.root){
-                nd.path.entry = nd.path.entry.parent!;
+            if(nd.path.channel != nd.path.mount?.root){
+                nd.path.channel = nd.path.channel.parent!;
                 break;
             }
             if(!this.follow_up(nd.path)){
@@ -220,7 +220,7 @@ export class NameI{
             }
         }
         this.followMount(nd);
-        nd.channel = nd.path.entry;
+        nd.channel = nd.path.channel;
     }
 
     handle_dots(nd: nameidata, type: Last){
@@ -240,19 +240,19 @@ export class NameI{
 
     async do_lookup(nd: nameidata, component: string) {
         if(component[0] == "#"){
-            nd.path.entry = await this.system.dev.getDevice(component.substring(1)).operations.attach!("", this.system);
+            nd.path.channel = await this.system.dev.getDevice(component.substring(1)).operations.attach!("", this.system);
             nd.path.mount = null;
             return;
         }
 
-        let c = channel_get_cache(nd.path.entry, component);
+        let c = channel_get_cache(nd.path.channel, component);
 
         if(!c){
-            if(!nd.path.entry.parent){
+            if(!nd.path.channel.parent){
                 if(nd.path.mount){
                     let m = this.system.vfs.mounts.lookupMountpoint(nd.path.mount!);
                     c = null;
-                    for(const mount of channelmounts(m?.entry!, nd.ns)){
+                    for(const mount of channelmounts(m?.channel!, nd.ns)){
                         try{
                             let ch = channel_get_cache(mount.root, component);
                             if(!ch){
@@ -271,25 +271,25 @@ export class NameI{
                     }
                 }else{
                     c = mkchannel();
-                    await nd.path.entry!.operations.walk?.(nd.path.entry, c, component)
-                    channel_set_cache(nd.path.entry, c);
+                    await nd.path.channel!.operations.walk?.(nd.path.channel, c, component)
+                    channel_set_cache(nd.path.channel, c);
                 }
             }else{
                 c = mkchannel();
-                await nd.path.entry!.operations.walk?.(nd.path.entry, c, component)
-                channel_set_cache(nd.path.entry, c);
+                await nd.path.channel!.operations.walk?.(nd.path.channel, c, component)
+                channel_set_cache(nd.path.channel, c);
             }
         }
 
-        nd.path.entry = c!;
+        nd.path.channel = c!;
         this.followMount(nd);
     }
 
     followMount(nd: nameidata){
-        if(nd.path.entry.mounted){
+        if(nd.path.channel.mounted){
             const l = this.system.vfs.mounts.lookup(nd.path, nd.ns);
             if(l){
-                nd.path.entry = l.entry;
+                nd.path.channel = l.channel;
                 nd.path.mount = l.mount;
             }
         }
