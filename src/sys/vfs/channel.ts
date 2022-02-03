@@ -1,8 +1,8 @@
-import {IDirectoryEntry, IStat} from "./operations";
+import {IDirectoryEntry} from "./operations";
 import {IMount, IMountNS} from "./mount";
 import {Channel} from "diagnostics_channel";
 import {System} from "../system";
-import {CreateMode, OpenMode, Type} from "../../public/api";
+import {CreateMode, IStat, OpenMode, Type} from "../../public/api";
 
 
 export interface IChannel {

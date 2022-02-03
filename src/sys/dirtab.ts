@@ -13,7 +13,7 @@ export interface IDirtab{
     dirtab?: IDirtab[]
 }
 
-export function mkdirtab(dirtab: IDirtab[]){
+export function mkdirtab(dirtab: IDirtab[] | (() => IDirtab[])){
     return {dirtab: dirtab};
 }
 const te = new TextEncoder()
@@ -21,7 +21,13 @@ export const read = async (c: IChannel, count: number, offset: number): Promise<
     const dirtab = (c.map as IDirtab);
     if(c.type & Type.DIR){
         if (dirtab.dirtab){
-            return te.encode(Array.from(dirtab.dirtab.map(x => {
+            let d:IDirtab[] = dirtab.dirtab;
+
+            if({}.toString.call(d) === '[object Function]'){
+                d = (d as any)() as IDirtab[];
+            }
+
+            return te.encode(Array.from(d.map(x => {
                 return x.name;
             })).reduce((x, y) => x + "\n" + y));
         }else{
@@ -38,7 +44,12 @@ export const read = async (c: IChannel, count: number, offset: number): Promise<
 
 export const walk = async (dir: IChannel, c: IChannel, name: string): Promise<IChannel> => {
     if(dir.map.dirtab){
-        for (const tab of dir.map.dirtab as IDirtab[]) {
+        let dirtab = dir.map.dirtab;
+        if({}.toString.call(dirtab) === '[object Function]'){
+            dirtab = dirtab();
+        }
+
+        for (const tab of dirtab as IDirtab[]) {
             if(tab.name == name){
                 c.map = tab;
                 c.type = tab.type;

@@ -32,6 +32,17 @@ export enum OpenMode {
     RCLOSE = 0x40,
 }
 
+export enum ForkMode2{
+    NEW_NAMESPACE,
+    CLONE_MNT,
+    CLONE_PID,
+    NO_MNT,
+    COPY_ENV,
+    EMPTY_ENV,
+    COPY_FD,
+    EMPTY_FD,
+}
+
 export enum ForkMode{
     RFNAMEG = 1,
     RFENVG = 2,
@@ -198,6 +209,7 @@ export interface ISystemCalls {
     getcwd: () => Promise<string>,
     close: (fd: FileDescriptor) => void,
     exec: (path: string, argv: string[]) => Promise<number>
+    fork: (path: string, argv: string[], mode: ForkMode2) => Promise<number>
     chcwd: (path: string) => void;
     die: (status: number) => Promise<void>
     mount: (fd: FileDescriptor, afd: FileDescriptor|null, old: string, flags?:number, aname?: string) => Promise<void>
@@ -215,4 +227,19 @@ export enum Type {
     AUTH = 0x08,		/* type bit for authentication file */
     TMP = 0x04,		/* type bit for not-backed-up file */
     FILE = 0x00		/* plain file */
+}
+
+export interface IStat {
+    /* system–modified data */
+    id: string;     /* server type */
+    dev: string;    /* server subtype */
+    /* file data */
+    mode: number;   /* permissions */
+    atime: Date;    /* last read time */
+    mtime: Date;    /* last write time */
+    length: number; /* file length */
+    name: string;   /* last element of path */
+    uid: string;    /* owner name */
+    gid: string;    /* group name */
+    muid: string;   /* last modifier name */
 }

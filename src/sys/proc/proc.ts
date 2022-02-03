@@ -1,10 +1,9 @@
 import {IDynaLib, IPEXF} from "../../shared/pexf";
 // import {IProcFSEntry, procCreate, procMkdir, procRemove} from "../fs/procfs/module";
-import {IPath} from "../vfs/path";
 import {System} from "../system";
 import {IChannel} from "../vfs/channel";
 import {Lookup} from "../vfs/namei";
-import {ForkMode, OpenMode, PError, Status} from "../../public/api";
+import {ForkMode2, OpenMode, PError, Status} from "../../public/api";
 import {
     FileDescriptor,
     MessageType,
@@ -13,15 +12,15 @@ import {
     MPCloseRes,
     MPCreateRes,
     MPDependency,
-    MPExecRes,
-    MPFork, MPForkRes,
+    MPForkRes,
     MPGetCwdRes,
     MPMountRes,
     MPOpenRes,
     MPPipeRes,
     MPReadRes,
     MPRemoveRes,
-    MPSignal, MPStart,
+    MPSignal,
+    MPStart,
     MPWriteRes,
     MUBind,
     MUChCwd,
@@ -40,7 +39,7 @@ import {
     Signal
 } from "../../shared/proc";
 import {pid, PidManager} from "./pid";
-import {IFile, IProtoTask, Task, ITaskStatus} from "./task";
+import {IFile, IProtoTask, Task} from "./task";
 
 
 export class ProcessManager {
@@ -125,7 +124,7 @@ export class ProcessManager {
                     if(!task.files.fileDescriptors){
                         throw new PError(Status.EBADFD);
                     }
-                    task.files.fileDescriptors[fd] = null;
+                    await this.closeFile(task, fd);
                     await task.send(MPCloseRes(id))
                     break;
                 }
@@ -149,7 +148,6 @@ export class ProcessManager {
                 }
 
                 case MessageType.MOUNT: {
-                    debugger;
                     let [id, fd, afd, old, aname, flags] = MUMount(message)
                     const mountpoint = await this.system.vfs.lookup(old, task)!;
                     const file = task.files.fileDescriptors[fd];
@@ -264,10 +262,10 @@ export class ProcessManager {
         throw new PError(Status.EBADFD);
     }
 
-    private async fetchDependencyChannel(deps: string[], task: IProtoTask): Promise<[string, IChannel][]> {
+    private async fetchDependencyChannel(deps: string[], task: IProtoTask): Promise<[string, IDynaLib, IChannel][]> {
         // TODO: this is wrong, it requires a dependency tree, or else you're loading twice dependencies
-        let result: [string, IChannel][] = [];
-        for(const dep in deps){
+        let result: [string, IDynaLib, IChannel][] = [];
+        for(const dep of deps){
             let entry = await this.system.vfs.lookup(`/lib/${dep}.dyna`, task)!;
             let file = await this.system.vfs.open(entry, OpenMode.EXEC | OpenMode.READ);
             let content: string;
@@ -282,7 +280,7 @@ export class ProcessManager {
             }
             let dynalibstruct: IDynaLib = JSON.parse(content.substring(8))
             result.concat(await this.fetchDependencyChannel(dynalibstruct.dependencies, task));
-            result.push([dep, file.channel]);
+            result.push([dep, dynalibstruct, file.channel]);
         }
         return result;
     }
@@ -295,12 +293,6 @@ export class ProcessManager {
         let container = await this.system.vfs.lookup(path + "/" + this.system.decoder.decode(id), parent)!;
         let cpu = await this.system.vfs.open(container, OpenMode.RDWR);
         return cpu.channel;
-    }
-
-    private async getBinChannel(path: string, parent: IProtoTask){
-        let entry = await this.system.vfs.lookup(path, parent)!;
-        let file = await this.system.vfs.open(entry, OpenMode.EXEC | OpenMode.READ);
-        return file;
     }
 
     private async fetchBin(channel: IChannel, parent: IProtoTask){
@@ -320,21 +312,46 @@ export class ProcessManager {
 
     private async loadDependencies(pexfstruct: IPEXF, task: Task, parent: IProtoTask){
         for(const dep of await this.fetchDependencyChannel(pexfstruct.dependencies, parent)){
-            const content = await dep[1].operations.read!(dep[1], -1, 0);
-            await task.send(MPDependency("", dep[0], this.system.decoder.decode(content)));
+            await task.send(MPDependency("", dep[0], dep[1].code));
         }
     }
 
-    async fork(entrypoint: string, args: string[], fork:ForkMode, parent: Task){
-        const path = parent.env.get("CPUPATH");
-        if(path){
-            const cpu = await this.getCPUChannel(path, parent);
-            const task = parent.fork(cpu, fork);
+    async fork(path: string, args: string[], fork:ForkMode2, parent: IProtoTask){
+        const cpupath = parent.env.get("CPUPATH");
+        if(cpupath){
+            const cpu = await this.getCPUChannel(cpupath, parent);
+            let ns;
+            if(fork & ForkMode2.NEW_NAMESPACE){
+                ns = this.system.ns.create(parent.ns, fork);
+            }else{
+                ns = parent.ns;
+            }
 
-            const bin = await this.fetchBin(task.path.channel, parent);
+            let entry = await this.system.vfs.lookup(path, parent)!;
+            let file = await this.system.vfs.open(entry, OpenMode.EXEC | OpenMode.READ);
+            const bin = await this.fetchBin(file.channel, parent);
+
+            let fds;
+            if(fork & ForkMode2.COPY_FD){
+                fds = {fileDescriptors:Array.from(parent.files.fileDescriptors)}
+            }else if(fork & ForkMode2.EMPTY_FD){
+                fds = {fileDescriptors: []};
+            }else{
+                fds = {fileDescriptors: parent.files};
+            }
+
+            let env;
+            if(fork & ForkMode2.COPY_ENV){
+                env = new Map(parent.env);
+            }else if(fork & ForkMode2.EMPTY_ENV){
+                env = new Map();
+            }else{
+                env = parent.env;
+            }
+
+            const task = new Task(entry, args, 1, 1, parent.pwd, parent.root, ns, parent.pid, cpu, fds, env, this.handleProcess.bind(this));
             await this.loadDependencies(bin, task, parent);
-
-            await task.send(MPStart("", bin.code, [path].concat(parent.argv)))
+            await task.send(MPStart("", bin.code, [path].concat(args)))
             setTimeout(async () => await task.run(), 0);
             return task;
         }
@@ -345,32 +362,20 @@ export class ProcessManager {
         const cpupath = task.env.get("CPUPATH");
         if(cpupath){
             const cpu = await this.getCPUChannel(cpupath, task);
-            await task.exec(cpu);
+            await task.switchCPU(cpu);
 
-            const file = await this.getBinChannel(path, task);
+            let entry = await this.system.vfs.lookup(path, task)!;
+            let file = await this.system.vfs.open(entry, OpenMode.EXEC | OpenMode.READ);
             const bin = await this.fetchBin(file.channel, task);
             await this.loadDependencies(bin, task, task);
 
             await task.send(MPStart("", bin.code, [path].concat(argv)))
             setTimeout(async () => await task.run(), 0);
+            task.path = entry;
+            task.argv = argv;
             return task;
         }
         throw new PError(Status.ENOENT);
-    }
-
-    async createFirstProcess(path: string, argv: string[], parent: IProtoTask, cpupath:string): Promise<Task> {
-        let entry = await this.system.vfs.lookup(path, parent)!;
-        let file = await this.system.vfs.open(entry, OpenMode.EXEC | OpenMode.READ);
-        const bin = await this.fetchBin(file.channel, parent)
-        const cpu = await this.getCPUChannel(cpupath, parent);
-
-        const task = new Task(entry, argv, 1, 1, parent.pwd, parent.root, parent.ns, parent.pid!, cpu, this.handleProcess.bind(this));
-        task.env.set("CPUPATH","/dev/cpu");
-        await this.loadDependencies(bin, task, parent);
-
-        await task.send(MPStart("", bin.code, [path].concat(argv)))
-        setTimeout(async () => await task.run(), 0);
-        return task;
     }
 
     wait(pid: pid, task: Task): Promise<string> {

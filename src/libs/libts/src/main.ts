@@ -67,26 +67,6 @@ export async function exit(code: Status){
 }
 
 /**
- * Registers the function as the entrypoint of the executoin
- *
- * @param entrypoint a function, typically `main`, that will be the entry point of the process
- */
-export async function entrypoint(entrypoint: (argv: string[]) => Promise<number>){
-    setTimeout(async () => {
-        try{
-            const exit = await entrypoint(self.proc.argv);
-        }catch (e) {
-            if (e instanceof PError){
-                self.proc.sys.die(e.code);
-            }else{
-                self.proc.sys.die(-1);
-            }
-        }finally {
-            self.proc.sys.die(0);
-        }
-    }, 0)
-}
-/**
  * Consumes the file into a string
  *
  * @param path path to file

@@ -7,7 +7,5 @@ declare module "libts" {
 
     export async function readline(): Promise<string>;
 
-    export async function entrypoint(entrypoint: (argv: string[]) => Promise<number>);
-
     export async function slurp(path: string): Promise<string>;
 }

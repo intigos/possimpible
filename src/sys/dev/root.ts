@@ -29,6 +29,10 @@ const rootdir: IDirtab[] = [
     {name: "root", id:1, type:Type.DIR, l:0, mode: 0},
     {name: "srv", id:1, type:Type.DIR, l:0, mode: 0},
     {name: "boot", id:1, type:Type.DIR, l:0, mode: 0, dirtab: bootdir},
+
+    // Check if this below is really needed
+    {name: "bin", id:1, type:Type.DIR, l:0, mode: 0},
+    {name: "lib", id:1, type:Type.DIR, l:0, mode: 0},
 ]
 
 async function init(system: System) {

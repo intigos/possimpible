@@ -25,7 +25,7 @@ class Process implements IDirtab{
         });
 
         this.worker.addEventListener("message", async (ev: MessageEvent<Uint8Array>) => {
-            console.log(debug(ev.data));
+            console.log(this.name.substring(0,5) + " <", debug(ev.data));
             await enqueue(this.aqueue, ev.data);
         });
     }
@@ -35,7 +35,7 @@ class Process implements IDirtab{
     }
 
     async write(c:IChannel, buf:Uint8Array, offset: number) {
-        console.log(debug(buf));
+        console.log(c.name.substring(0,5) + " >", debug(buf));
         c.map.worker.postMessage(buf);
     }
 

@@ -10,14 +10,16 @@ import root from "./dev/root";
 import cons from "./dev/cons";
 import kbd from "./dev/kbd";
 import serial from "./dev/serial";
-import {LogLevel, LogManager} from "./log";
-import {red, yellow} from "./colors";
+import {LogManager} from "./log";
+import {red} from "./colors";
 import srv from "./dev/srv";
 import bootimg from "./dev/bootimg";
 import pipe from "./dev/pipe";
 import mount from "./dev/mount";
-import {IFile, IProtoTask, Task} from "./proc/task";
+import {IFile, IProtoTask} from "./proc/task";
 import cpu from "./dev/cpu";
+import {ForkMode2} from "../public/api";
+import env from "./dev/env";
 
 
 export type ISystemOptions = Record<string, string>;
@@ -54,18 +56,22 @@ export class System{
     }
 
     private async setupSystemTask() {
-        const ns = this.ns.create(0, null);
+        const ns = this.ns.create(null, 0);
 
         const root = await this.vfs.attach("/", "");
         let mount = await this.vfs.cmount(root, mkchannel(), 0, null, ns.mnt);
 
         this.ktask = {
+            pid: 0,
             root: {channel: root, mount: mount},
             pwd: {channel: root, mount: mount},
             ns: ns,
+            files: {fileDescriptors: []},
+            env: new Map<string, string>()
         };
 
         const cpu = await this.vfs.attach("C", "");
+        this.ktask.env.set("CPUPATH", "/dev/cpu");
         const dev = await this.vfs.lookup("/dev", this.ktask);
         await this.vfs.cmount(cpu, dev.channel, 0, dev.mount, ns.mnt);
 
@@ -73,20 +79,21 @@ export class System{
     }
 
     async boot(devices:IDeviceDescription[]){
-        await this.mod.installModule(root)
-        await this.mod.installModule(cons)
-        await this.mod.installModule(kbd)
-        await this.mod.installModule(srv)
-        await this.mod.installModule(serial)
-        await this.mod.installModule(bootimg)
-        await this.mod.installModule(pipe)
-        await this.mod.installModule(mount)
-        await this.mod.installModule(cpu)
+        await this.mod.installModule(root);
+        await this.mod.installModule(cons);
+        await this.mod.installModule(kbd);
+        await this.mod.installModule(srv);
+        await this.mod.installModule(serial);
+        await this.mod.installModule(bootimg);
+        await this.mod.installModule(pipe);
+        await this.mod.installModule(mount);
+        await this.mod.installModule(cpu);
+        await this.mod.installModule(env);
         this.descriptions = devices;
         await this.dev.init()
         await this.setupSystemTask();
 
-        const task = await this.proc.createFirstProcess("/boot/boot", [], this.current!, "/dev/cpu");
+        const task = await this.proc.fork("/boot/boot", [], ForkMode2.NEW_NAMESPACE | ForkMode2.EMPTY_FD | ForkMode2.CLONE_MNT | ForkMode2.COPY_ENV, this.current!)
 
         await this.proc.wait(1, task);
     }

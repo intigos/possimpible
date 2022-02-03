@@ -1,4 +1,3 @@
-import {entrypoint} from "libts";
 import {CreateMode} from "../../../public/api";
 
 async function main(argv: string[]): Promise<number>{
@@ -7,4 +6,4 @@ async function main(argv: string[]): Promise<number>{
     return 0;
 }
 
-entrypoint(main);
+self.proc.entrypoint(main);

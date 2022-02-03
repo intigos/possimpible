@@ -66,7 +66,7 @@ export const MPTwalk = (tag: Tag, fd: Fid, newfd: Fid, wname: string[]) => pack(
 export const MUTwalk = (a: Uint8Array) => unpack(a, [unpackUInt8, unpackUInt16, unpackUInt32, unpackUInt32, unpackA(unpackString)]) as [Protocol9P, Tag, Fid, Fid, string[]];
 
 export const MPRwalk = (tag: Tag, type: Type[]) => pack([packUInt8(Protocol9P.Rwalk), packUInt16(tag), packA(type, packUInt8)]);
-export const MURwalk = (a: Uint8Array) => unpack(a, [unpackUInt8, unpackUInt16, unpackA(unpackInt8)])  as [Protocol9P, Tag, Type[]];
+export const MURwalk = (a: Uint8Array) => unpack(a, [unpackUInt8, unpackUInt16, unpackA(unpackUInt8)])  as [Protocol9P, Tag, Type[]];
 
 export const MPTopen = (tag: Tag, fd: Fid, mode: OpenMode) => pack([packUInt8(Protocol9P.Topen), packUInt16(tag), packUInt32(fd), packUInt8(mode)]);
 export const MUTopen = (a: Uint8Array) => unpack(a, [unpackUInt8, unpackUInt16, unpackUInt32, unpackUInt8]) as [Protocol9P, Tag, Fid, OpenMode];

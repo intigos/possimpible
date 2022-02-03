@@ -40,7 +40,7 @@ export function unpackString(s:Uint8Array, p: number): Unpacked<string>{
 
 export function packA<T>(s:T[], packer:Packer<T>): Uint8Array{
     const arrs = s.map(x => packer(x));
-    const length = arrs.map(x => x.length).reduce((x, y) => x + y);
+    const length = arrs.map(x => x.length).reduce((x, y) => x + y, 0);
     const result = new Uint8Array(8 + length);
     const dv = new DataView(result.buffer);
     dv.setFloat64(0, s.length);

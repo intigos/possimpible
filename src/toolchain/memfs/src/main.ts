@@ -1,7 +1,6 @@
-import {CreateMode, OpenMode, Type} from "../../../public/api";
+import {CreateMode, IStat, OpenMode, Type} from "../../../public/api";
 import {Fid, Service9P} from "../../../public/9p";
-import {IMemINode, IMemSuperNode, MemDirEnt_ptr, MemINodeType} from "../../../sys/memfs/low";
-import {IStat} from "../../../sys/vfs/operations";
+import {IMemINode, IMemSuperNode, MemData_ptr, MemDirEnt_ptr, MemINodeType} from "../../../sys/memfs/low";
 
 async function slurp(s: string){
     const fd = await self.proc.sys.open(s, OpenMode.READ);
@@ -12,7 +11,8 @@ function dirp(type: MemINodeType): Type {
     return type == MemINodeType.DIRECTORY ? Type.DIR : Type.FILE;
 }
 
-setTimeout(async () => {
+try {
+    await (async () => {
     let syscall = self.proc.sys;
     const path = self.proc.argv;
     const img = path[1];
@@ -28,7 +28,6 @@ setTimeout(async () => {
 
     const srv = new Service9P(pipefd[1], {
         async attach(fid: Fid, aname: string): Promise<Type> {
-            debugger;
             const root = sb.nodes[0];
             srv.set(fid, root);
             return root?.type == MemINodeType.DIRECTORY ? Type.DIR : Type.FILE;
@@ -53,8 +52,13 @@ setTimeout(async () => {
 
         read(fid: Fid, offset: number, count: number): Promise<Uint8Array> {
             const node = srv.get(fid) as IMemINode;
-            let s = sb.data[node.pos]!;
-            return Promise.resolve(new TextEncoder().encode(s));
+            let result;
+            if(node.type == MemINodeType.DIRECTORY){
+                result = (node.map as MemDirEnt_ptr[]).map(x => sb.dirents[x]?.name || "").reduce((x, y) => x + "\n" + y);
+            }else{
+                result = sb.data[node.map as MemData_ptr]!;
+            }
+            return Promise.resolve(new TextEncoder().encode(result));
         },
 
         remove(fid: Fid): Promise<void> {
@@ -67,34 +71,37 @@ setTimeout(async () => {
 
         walk(fid: Fid, newfid: Fid, name: string[]): Promise<Type[]> {
             let node = srv.get(fid) as IMemINode;
+            srv.set(newfid, node);
             let result: Type[] = []
-            for(const n of name){
-                if(n == ".") {
-                    result.push(dirp(node.type));
-                    continue;
-                }else if(n == ".." && node.parent) {
-                    node = sb.nodes[node.parent]!;
-                    result.push(dirp(node.type));
-                    continue;
-                }
-                else if(node.type == MemINodeType.DIRECTORY){
-                    for(const ptr of node.map as MemDirEnt_ptr[]){
-                        const dirent = sb.dirents[ptr];
+            name:
+                for (const n of name) {
+                    node = srv.get(newfid);
+                    if (n == ".") {
+                        result.push(dirp(node.type));
+                        continue;
+                    } else if (n == ".." && node.parent) {
+                        node = sb.nodes[node.parent]!;
+                        result.push(dirp(node.type));
+                        continue;
+                    } else if (node.type == MemINodeType.DIRECTORY) {
+                        for (const ptr of node.map as MemDirEnt_ptr[]) {
+                            const dirent = sb.dirents[ptr];
 
-                        if(dirent?.name){
-                            node = sb.nodes[dirent.node]!;
-                            result.push(dirp(node.type));
-                            continue;
+                            if (dirent?.name == n) {
+                                node = sb.nodes[dirent.node]!;
+                                srv.set(newfid, node);
+                                result.push(dirp(node.type));
+                                break name;
+                            }
                         }
+                        throw "Not an entity";
+                    } else {
+                        throw "not a dir";
                     }
-                    throw "Not an entity";
-                }else{
-                    throw "not a dir";
                 }
-            }
 
 
-            return Promise.resolve([]);
+            return Promise.resolve(result);
         },
 
         wattr(fid: Fid, l: string, s: string): Promise<void> {
@@ -111,5 +118,8 @@ setTimeout(async () => {
 
     })
     await srv.run();
-
-},0);
+    })();
+}catch (e) {
+    console.log(e);
+    self.proc.sys.die(1);
+}

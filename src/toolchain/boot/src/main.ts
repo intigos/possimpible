@@ -6,6 +6,7 @@ setTimeout(async () => {
     await syscall.bind("#c", "/dev");
     await syscall.bind("#b", "/dev");
     await syscall.bind("#s", "/srv");
+    await syscall.bind("#e", "/env");
     await syscall.bind("#⌨️", "/dev");
 
     await syscall.bind("/dev/serial", "/dev/cons");
@@ -18,12 +19,14 @@ setTimeout(async () => {
     syscall.write(0, te.encode("Booting System...\n\r\n\r"));
 
     await syscall.write(0, te.encode("mounting root\n\r"));
-    await syscall.exec("/boot/memfs", ["#💾/initrd0", "/srv/initrd"]);
+    await syscall.fork("/boot/memfs", ["#💾/initrd0", "/srv/initrd"], 0);
 
     setTimeout(async x => {
         const fd = await syscall.open("/srv/initrd", OpenMode.RDWR)
         await syscall.mount(fd, null, "/root", MountType.REPL);
-
+        await syscall.bind("/root/bin", "/bin");
+        await syscall.bind("/root/lib", "/lib");
+        await syscall.exec("/bin/login", []);
     }, 100);
 
 },0);

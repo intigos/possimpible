@@ -2,7 +2,7 @@ import {IChannel} from "../vfs/channel";
 import {INSProxy} from "../ns/ns";
 import {IPath} from "../vfs/path";
 import {pid} from "./pid";
-import {ForkMode} from "../../public/api";
+import {ForkMode, ForkMode2} from "../../public/api";
 import {debug, peak} from "../../shared/proc";
 
 export enum ITaskStatus {
@@ -21,17 +21,21 @@ function mkfile(c: IChannel): IFile {
 }
 
 export interface ITaskFiles {
-    fileDescriptors: (IFile | null)[]
+    fileDescriptors: (IFile|null)[]
 }
 
 export interface IProtoTask {
-    pid?: number,
+    pid: number,
     uid?: number,
     gid?: number,
     ns: INSProxy;
     root: IPath;
     pwd: IPath;
+    env: Enviroment,
+    files: ITaskFiles,
 }
+
+export type Enviroment = Map<string,string>;
 
 export class Task implements IProtoTask {
     status = ITaskStatus.RUNNGING
@@ -48,12 +52,12 @@ export class Task implements IProtoTask {
     files: ITaskFiles;
     parent?: pid;
     cpu: IChannel;
-    env = new Map<string,string>();
-    private handler: (arr: Uint8Array, task: Task) => void;
+    handler: (arr: Uint8Array, task: Task) => void;
+    env: Enviroment;
 
      constructor(path: IPath, argv: string[], uid: number, gid: number, pwd: IPath,
-                 root: IPath, ns: INSProxy, parentPid: number, cpu: IChannel,
-                 handler: (arr: Uint8Array, task: Task) => void) {
+                 root: IPath, ns: INSProxy, parentPid: number, cpu: IChannel, files: ITaskFiles,
+                 env: Enviroment, handler: (arr: Uint8Array, task: Task) => void) {
         this.sys = true;
         this.pid = 0;
         ns.pid.attach(this);
@@ -68,6 +72,7 @@ export class Task implements IProtoTask {
         this.files = {fileDescriptors: []};
         this.parent = parentPid;
         this.cpu = cpu;
+        this.env = env;
         this.handler = handler;
     }
 
@@ -84,14 +89,7 @@ export class Task implements IProtoTask {
          }
     }
 
-    fork(cpu:IChannel, fork: ForkMode): Task{
-        const task = new Task(this.path, this.argv, this.uid, this.gid, this.pwd,
-            this.root, this.ns, this.pid, this.cpu, this.handler);
-
-        return task;
-    }
-
-    async exec(cpu: IChannel) {
+    async switchCPU(cpu: IChannel) {
         await this.cpu.operations.remove?.(this.cpu);
         this.cpu = cpu;
     }
@@ -109,8 +107,6 @@ export class Task implements IProtoTask {
             mount: path.mount
         }
     }
-
-
 
     async kill() {
         await this.cpu.operations.remove?.(this.cpu);

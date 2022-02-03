@@ -37,7 +37,6 @@ class MountClient{
 
     private async mountrpc<T extends (...args) => Uint8Array,R extends (m: Uint8Array) => any>(args: Parameters<typeof pack>, pack:T, unpack:R): Promise<ReturnType<R>>{
         const tag = this.tag++;
-        debugger
         args[0] = tag
         await this.srv.operations.write?.(this.srv, pack(...args), 0)
         const buf = await this.srv.operations.read?.(this.srv, -1, 0)!;

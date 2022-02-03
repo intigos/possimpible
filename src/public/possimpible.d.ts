@@ -6,6 +6,7 @@ declare global {
         proc: {
             argv: string[],
             sys: ISystemCalls
+            entrypoint(ep: (...args: any) => any, p?: string)
         };
     }
 }

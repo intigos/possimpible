@@ -1,4 +1,4 @@
-import {CreateMode, MountType, OpenMode, Status} from "../public/api";
+import {CreateMode, ForkMode2, MountType, OpenMode, Status} from "../public/api";
 import {
     pack,
     packA, packBytearray,
@@ -120,15 +120,15 @@ export const MPForkStart = (id: MessageID, code: string, entrypoint:string, args
 export const MUForkStart = (a: Uint8Array) =>
     unpackMessage(a, [unpackInt8, unpackString, unpackString, unpackString, unpackA(unpackString)]) as [MessageID, string, string[]]
 
-export const MPFork = (id: MessageID, entrypoint:string, args: string[]) =>
-    pack([packInt8(MessageType.FORK), packString(id), packString(entrypoint), packA(args, packString)])
+export const MPFork = (id: MessageID, path:string, args: string[], mode: ForkMode2) =>
+    pack([packInt8(MessageType.FORK), packString(id), packString(path), packA(args, packString), packDouble(mode)])
 export const MUFork = (a: Uint8Array) =>
-    unpackMessage(a, [unpackInt8, unpackString, unpackString, unpackA(unpackString)]) as [MessageID, string, string[]]
+    unpackMessage(a, [unpackInt8, unpackString, unpackString, unpackA(unpackString), unpackDouble]) as [MessageID, string, string[]]
 
 export const MPForkRes = (id: MessageID, pid: number) =>
     pack([packInt8(MessageType.FORK_RES), packString(id), packUInt32(pid)])
 export const MUForkRes = (a: Uint8Array) =>
-    unpackMessage(a, [unpackInt8, unpackUInt32]) as [MessageID, string, string[]]
+    unpackMessage(a, [unpackInt8, unpackString, unpackUInt32]) as [MessageID, string, string[]]
 
 
 export const MPExec = (id: MessageID, code: string, args: string[]) =>
@@ -256,8 +256,6 @@ export function debug(a: Uint8Array){
         case MessageType.EXEC:
             result = MUExec(a);
             break;
-        case MessageType.FORK:
-            break;
         case MessageType.CHCWD:
             result = MUChCwd(a);
             break;
@@ -300,8 +298,6 @@ export function debug(a: Uint8Array){
         case MessageType.EXEC_RES:
             result = MUExecRes(a);
             break;
-        case MessageType.FORK_RES:
-            break;
         case MessageType.CHCWD_RES:
             result = MUChCwdRes(a);
             break;
@@ -322,6 +318,12 @@ export function debug(a: Uint8Array){
             break;
         case MessageType.SIGNAL:
             result = MUSignal(a);
+            break;
+        case MessageType.FORK:
+            result = MUFork(a);
+            break;
+        case MessageType.FORK_RES:
+            result = MUForkRes(a);
             break;
     }
 

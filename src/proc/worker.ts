@@ -5,12 +5,12 @@
  * @module worker
  */
 
-import {CreateMode, ISystemCalls, MountType, OpenMode, PError, Status} from "../public/api";
+import {CreateMode, ForkMode2, ISystemCalls, MountType, OpenMode, PError, Status} from "../public/api";
 import {
     debug,
     FileDescriptor,
     MessageID,
-    MessageType, MPBind, MPChCwd, MPClose, MPCreate, MPDie, MPExec, MPGetCwd, MPMount, MPOpen, MPPipe,
+    MessageType, MPBind, MPChCwd, MPClose, MPCreate, MPDie, MPExec, MPFork, MPGetCwd, MPMount, MPOpen, MPPipe,
     MPRead, MPReady, MPRemove, MPUnmount, MPWrite, MUCreateRes,
     MUDependency, MUExecRes, MUGetCwdRes, MUOpenRes, MUPipeRes,
     MUReadRes, MURemoveRes, MUSignal,
@@ -49,7 +49,8 @@ export class Process{
         mount: this.sys_mount.bind(this),
         unmount: this.sys_unmount.bind(this),
         pipe: this.sys_pipe.bind(this),
-        create: this.sys_create.bind(this)
+        create: this.sys_create.bind(this),
+        fork: this.sys_fork.bind(this)
     }
     private callsites = new Map<string, (...args: any) => any>()
 
@@ -74,7 +75,8 @@ export class Process{
                 this.router.delete(id);
             }
         }else if(type == MessageType.DEPENDENCY){
-            let [_, name, code] = MUDependency(message)
+            let [_, name, code] = MUDependency(message);
+            (self as any)[name] = null;
             eval(code);
         }else if(type == MessageType.START){
             let [_, code, argv] = MUStart(message)
@@ -144,6 +146,12 @@ export class Process{
 
     private async sys_exec(path: string, argv:string[]) : Promise<number>{
         const res = await this.callWithPromise(MPExec(this.uuidv4(), path, argv));
+        const [_, pid] = MUExecRes(res);
+        return pid;
+    }
+
+    private async sys_fork(path: string, argv:string[], mode: ForkMode2) : Promise<number>{
+        const res = await this.callWithPromise(MPFork(this.uuidv4(), path, argv, mode));
         const [_, pid] = MUExecRes(res);
         return pid;
     }

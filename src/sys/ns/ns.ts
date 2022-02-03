@@ -1,17 +1,13 @@
 import {System} from "../system";
 import {IMountNS} from "../vfs/mount";
 import {PidNS} from "../proc/pid";
+import {ForkMode2} from "../../public/api";
 
 export interface INSProxy {
     parent: INSProxy|null,
     mnt: IMountNS,
     pid: PidNS,
     children: INSProxy[]
-}
-
-export enum NSOp {
-    CLONE_MOUNT = 0x000001,
-    CLONE_PROC = 0x000002,
 }
 
 export class NamespaceManager{
@@ -21,9 +17,31 @@ export class NamespaceManager{
         this.system = system;
     }
 
-    create(options: NSOp, ns: INSProxy|null): INSProxy {
-        const mnt = this.system.vfs.mounts.createNS(ns?ns.mnt:null, (options & NSOp.CLONE_MOUNT) == NSOp.CLONE_MOUNT);
-        const pid = this.system.proc.pids.createNS(null)
+    create(ns: INSProxy|null, flags: ForkMode2): INSProxy {
+        let mnt;
+        let pid;
+
+        if(ns) {
+            if (flags & ForkMode2.NEW_NAMESPACE) {
+                if (flags & ForkMode2.CLONE_MNT) {
+                    mnt = this.system.vfs.mounts.createNS(ns ? ns.mnt : null, true);
+                } else {
+                    mnt = this.system.vfs.mounts.createNS(ns ? ns.mnt : null, false);
+                }
+                if (flags & ForkMode2.CLONE_PID) {
+                    pid = this.system.proc.pids.createNS(ns ? ns.pid : null);
+                }else{
+                    pid = ns.pid;
+                }
+            } else {
+                pid = ns.pid;
+                mnt = ns.mnt;
+            }
+        }else{
+            mnt = this.system.vfs.mounts.createNS(null, false);
+            pid = this.system.proc.pids.createNS(null);
+        }
+
         const result: INSProxy = {
             parent: ns,
             mnt,

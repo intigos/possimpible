@@ -97,4 +97,7 @@ module.exports = (env = {}) => ({
             '#': path.resolve(__dirname, '/src/libs/include'),
         },
     },
+    experiments: {
+        topLevelAwait: true,
+    },
 });

@@ -1,7 +1,7 @@
 import {ISystemModule} from "../modules";
 import {System} from "../system";
 import {IDirtab, mkdirtab, read, walk} from "../dirtab";
-import {mkchannel} from "../vfs/channel";
+import {IChannel, mkchannel} from "../vfs/channel";
 import {Type} from "../../public/api";
 
 function init(system: System){
@@ -13,8 +13,9 @@ function init(system: System){
                     write: async (file, buf, offset) => {
                         return (x as any).properties.write(buf);
                     },
-                    read: async (file, buf) => {
-                        return (x as any).properties.write(buf);
+                    read: async (c: IChannel, count: number, offset: number) => {
+                        const buf = await (x as any).properties.read();
+                        return new TextEncoder().encode(buf);
                     },
                 }
             ]

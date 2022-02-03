@@ -1,5 +1,5 @@
 import {FD_STDOUT} from "../../../public/api";
-import {entrypoint, print, slurp} from "libts";
+import {print, slurp} from "libts";
 
 function args(args: string[]){
     const result: any = {
@@ -40,9 +40,9 @@ async function main(argv: string[]): Promise<number>{
     }else{
         const a = args(argv);
 
-        self.proc.sys.mount(a.type, a.device, a.options, a.mountpoint)
+        await self.proc.sys.mount(a.type, a.device, a.options, a.mountpoint)
     }
     return 0;
 }
 
-entrypoint(main);
+self.proc.entrypoint(main);
