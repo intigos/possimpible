@@ -231,12 +231,13 @@ export enum Type {
 
 export interface IStat {
     /* system–modified data */
-    id: string;     /* server type */
-    dev: string;    /* server subtype */
+    srv: string;     /* server type */
+    subsrv: number;    /* server subtype */
+    type: Type;
     /* file data */
     mode: number;   /* permissions */
-    atime: Date;    /* last read time */
-    mtime: Date;    /* last write time */
+    atime: number;    /* last read time */
+    mtime: number;    /* last write time */
     length: number; /* file length */
     name: string;   /* last element of path */
     uid: string;    /* owner name */

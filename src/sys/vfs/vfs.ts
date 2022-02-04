@@ -1,10 +1,11 @@
 import {IMount, IMountNS, MountManager} from "./mount";
-import {channelmounts, IChannel, mkchannel} from "./channel";
+import {channelmounts, IChannel} from "./channel";
 import {Last, Lookup, NameI} from "./namei";
 import {IPath} from "./path";
 import {System} from "../system";
-import {OpenMode, PError, Status} from "../../public/api";
+import {IStat, OpenMode, PError, Status} from "../../public/api";
 import {IFile, IProtoTask} from "../proc/task";
+import {unpackA, unpackBytearray, unpackStat} from "../../shared/struct";
 
 const DIV = "/"
 
@@ -107,7 +108,7 @@ export class VirtualFileSystem{
     async create(path: IPath, name:string, mode: number){
         if (path.channel) {
             if(path.channel.operations.create){
-                const c = mkchannel();
+                const c = this.system.channels.clone(path.channel);
                 path.channel.operations.create(path.channel, c, name, mode);
                 return {
                     position: 0,
@@ -128,5 +129,43 @@ export class VirtualFileSystem{
     }
 
 
+    async dirread(channel: IChannel, task: IProtoTask): Promise<IStat[]> {
+        let a: IStat[] = [];
+        let m = task.ns.mnt.mounts.find(x => x.mount.root == channel);
+        if (m) {
+            for (const mount of channelmounts(m.mount.mountpoint, task.ns.mnt)) {
+                if(mount.root.operations.read){
+                    const buf = await mount.root.operations.read!(mount.root, -1, 0);
+                    a.push(...unpackA(unpackStat)(buf, 0)[0])
+                }else{
+                    debugger;
+                    throw new PError(Status.EPERM);
+                }
+            }
+        }else{
+            const buf = await channel.operations.read!(channel, -1, 0);
+            a = unpackA(unpackStat)(buf, 0)[0];
+        }
+        a.sort((a, b): number => {
+            if (a.name > b.name) {
+                return -1;
+            }
+            if (b.name > a.name) {
+                return 1;
+            }
+            return 0;
+        });
+
+        if (channel.operations.getstat){
+            a.unshift(await channel.operations.getstat!(channel));
+        }else throw new PError(Status.EPERM);
+
+        const parent = channel.parent ? channel.parent : channel;
+        if (parent.operations.getstat){
+            a.unshift(await parent.operations.getstat!(parent));
+        }else throw new PError(Status.EPERM);
+
+        return a;
+    }
 }
 

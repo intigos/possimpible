@@ -1,7 +1,6 @@
 import {ISystemModule} from "../modules";
 import {System} from "../system";
-import {IDirtab, mkdirtab, read, walk} from "../dirtab";
-import {mkchannel} from "../vfs/channel";
+import {getstat, IDirtab, mkdirtabA, read, walk} from "../dirtab";
 import {Type} from "../../public/api";
 
 const rootdir: IDirtab[] = []
@@ -10,7 +9,7 @@ function init(system: System){
     system.dev.registerDriver({
         probe: async (x, match) => {
             rootdir.push({
-                name: x.id, id:1, type:Type.FILE, l:0, mode: 0,
+                name: x.id, id:1, type:Type.FILE, l:0, mode: 0, uid: system.sysUser,
                 read: async (file, buf) => {
                     return new Uint8Array(await (await (await fetch((x as any).properties.image)).blob()).arrayBuffer())
                 }
@@ -28,11 +27,14 @@ function init(system: System){
         name: "image",
         operations: {
             attach: async (options, system1) => {
-                let c = mkchannel();
-                c.map = mkdirtab(rootdir);
+                let c = system.channels.mkchannel();
+                c.srv = "💾"
+                c.map = mkdirtabA(rootdir, system1);
+                c.type = Type.DIR
                 c.operations = {
                     read: read,
-                    walk: walk
+                    walk: walk,
+                    getstat: getstat
                 }
                 return c;
             }

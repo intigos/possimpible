@@ -4,7 +4,7 @@ import {VirtualFileSystem} from "./vfs/vfs";
 import {ProcessManager} from "./proc/proc";
 import {ModularityManager} from "./modules";
 import {NamespaceManager} from "./ns/ns";
-import {mkchannel} from "./vfs/channel";
+import {ChannelManager} from "./vfs/channel";
 
 import root from "./dev/root";
 import cons from "./dev/cons";
@@ -37,16 +37,22 @@ export class System{
     public mod: ModularityManager;
     public ns: NamespaceManager;
     public proc: ProcessManager;
+    public channels: ChannelManager;
+    public sysUser = "root";
     public encoder = new TextEncoder();
     public decoder = new TextDecoder();
 
     public current?: IProtoTask;
     private console?: IFile;
     private log: LogManager;
+    boottime = new Date().getTime() / 1000;
     ktask?: IProtoTask;
+
+
 
     constructor(options: Partial<ISystemOptions>){
         this.options = options;
+        this.channels = new ChannelManager(this);
         this.vfs = new VirtualFileSystem(this);
         this.dev = new DeviceManager(this);
         this.proc = new ProcessManager(this);
@@ -59,9 +65,10 @@ export class System{
         const ns = this.ns.create(null, 0);
 
         const root = await this.vfs.attach("/", "");
-        let mount = await this.vfs.cmount(root, mkchannel(), 0, null, ns.mnt);
+        let mount = await this.vfs.cmount(root, this.channels.mkchannel(), 0, null, ns.mnt);
 
         this.ktask = {
+            gid: this.sysUser, uid: this.sysUser,
             pid: 0,
             root: {channel: root, mount: mount},
             pwd: {channel: root, mount: mount},

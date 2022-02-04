@@ -1,6 +1,7 @@
 import {FD_STDIN, FD_STDOUT, PError, Status} from "../../../public/api";
 import stringToArgv from "string-to-argv";
 import {wait, exit as die, print} from "libts";
+import {ls} from "./ls";
 
 let syscall = self.proc.sys;
 
@@ -29,15 +30,7 @@ setTimeout(async () => {
             const argv = stringToArgv(buf);
             let cmd = argv[0];
             if(cmd == "ls") {
-                let path = cwd;
-                if (argv.length > 1) {
-                    path = argv[1];
-                }
-                let fd = await self.proc.sys.open(path, 0);
-                let dirents = td.decode(await self.proc.sys.read(fd, -1))
-                for (let x of dirents.split("\n")) {
-                    print(x + "\n\r")
-                }
+                await ls(argv, cwd);
             }else if(cmd == "exit"){
                 await die(1);
             }else if(cmd == "cd"){

@@ -3,7 +3,7 @@ import {IDynaLib, IPEXF} from "../../shared/pexf";
 import {System} from "../system";
 import {IChannel} from "../vfs/channel";
 import {Lookup} from "../vfs/namei";
-import {ForkMode2, OpenMode, PError, Status} from "../../public/api";
+import {ForkMode2, OpenMode, PError, Status, Type} from "../../public/api";
 import {
     FileDescriptor,
     MessageType,
@@ -20,7 +20,7 @@ import {
     MPReadRes,
     MPRemoveRes,
     MPSignal,
-    MPStart,
+    MPStart, MPStat, MPStatRes,
     MPWriteRes,
     MUBind,
     MUChCwd,
@@ -33,13 +33,14 @@ import {
     MUOpen,
     MUPipe,
     MURead,
-    MURemove,
+    MURemove, MUStat,
     MUWrite,
     peak,
     Signal
 } from "../../shared/proc";
 import {pid, PidManager} from "./pid";
 import {IFile, IProtoTask, Task} from "./task";
+import {packA, packStat} from "../../shared/struct";
 
 
 export class ProcessManager {
@@ -76,19 +77,37 @@ export class ProcessManager {
                     let [id, fd, count] = MURead(message);
                     const file = task.files.fileDescriptors[fd];
                     if (file) {
-                        let buf;
-                        const channel = file.channel;
-                        if(channel.operations.read){
-                            buf = await channel.operations.read(channel, count, file.position);
+                        if(file.channel.type == Type.DIR){
+                            const stats = await this.system.vfs.dirread(file.channel, task);
+                            await task.send(MPReadRes(id, packA(stats, packStat)))
                         }else{
-                            throw new PError(Status.EINVAL);
+                            let buf;
+                            const channel = file.channel;
+                            if(channel.operations.read){
+                                buf = await channel.operations.read(channel, count, file.position);
+                            }else{
+                                throw new PError(Status.EINVAL);
+                            }
+                            await task.send(MPReadRes(id, buf))
                         }
-                        await task.send(MPReadRes(id, buf))
                     } else {
                         throw new PError(Status.EBADFD);
                     }
                     break;
                 }
+
+                case MessageType.STAT: {
+                    let [id, fd] = MUStat(message);
+                    const file = task.files.fileDescriptors[fd];
+                    if(file){
+                        if(file.channel.operations.getstat){
+                            const stat = await file.channel.operations.getstat(file.channel);
+                            await task.send(MPStatRes(id, stat));
+                        }else throw new PError(Status.EPERM);
+                    }else throw new PError(Status.EBADFD);
+                    break;
+                }
+
                 case MessageType.GETCWD: {
                     let [id] = MUGetCwd(message);
                     await task.send(MPGetCwdRes(id, this.system.vfs.path(task.pwd, task)))
@@ -349,7 +368,7 @@ export class ProcessManager {
                 env = parent.env;
             }
 
-            const task = new Task(entry, args, 1, 1, parent.pwd, parent.root, ns, parent.pid, cpu, fds, env, this.handleProcess.bind(this));
+            const task = new Task(entry, args, this.system.sysUser, this.system.sysUser, parent.pwd, parent.root, ns, parent.pid, cpu, fds, env, this.handleProcess.bind(this));
             await this.loadDependencies(bin, task, parent);
             await task.send(MPStart("", bin.code, [path].concat(args)))
             setTimeout(async () => await task.run(), 0);

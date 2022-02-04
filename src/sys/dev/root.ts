@@ -1,52 +1,56 @@
 import {System} from "../system";
-import {mkchannel} from "../vfs/channel";
 import {ISystemModule} from "../modules";
 // @ts-ignore
 import bootbin from "&/bin/boot.img";
 // @ts-ignore
 import memfs from "&/bin/memfs.img";
-import {IDirtab, mkdirtab, read, walk} from "../dirtab";
+import {getstat, IDirtab, mkdirtabA, read, walk} from "../dirtab";
 import {Type} from "../../public/api";
 
-const bootdir: IDirtab[] = [
-    {name: "boot", id:1, type:Type.FILE, l:0, mode: 0,
-     read: async (c, count, offset) => {
-        return new Uint8Array(await (await (await fetch(bootbin)).blob()).arrayBuffer());
-     }},
-    {name: "memfs", id:1, type:Type.FILE, l:0, mode: 0,
-     read: async (c, count, offset) => {
-        return new Uint8Array(await (await (await fetch(memfs)).blob()).arrayBuffer());
-    }},
-];
-
-const rootdir: IDirtab[] = [
-    {name: "dev", id:1, type:Type.DIR, l:0, mode: 0},
-    {name: "env", id:1, type:Type.DIR, l:0, mode: 0},
-    {name: "fd", id:1, type:Type.DIR, l:0, mode: 0},
-    {name: "mnt", id:1, type:Type.DIR, l:0, mode: 0},
-    {name: "net", id:1, type:Type.DIR, l:0, mode: 0},
-    {name: "proc", id:1, type:Type.DIR, l:0, mode: 0},
-    {name: "root", id:1, type:Type.DIR, l:0, mode: 0},
-    {name: "srv", id:1, type:Type.DIR, l:0, mode: 0},
-    {name: "boot", id:1, type:Type.DIR, l:0, mode: 0, dirtab: bootdir},
-
-    // Check if this below is really needed
-    {name: "bin", id:1, type:Type.DIR, l:0, mode: 0},
-    {name: "lib", id:1, type:Type.DIR, l:0, mode: 0},
-]
-
 async function init(system: System) {
+    const bootdir: IDirtab[] = [
+        {name: "boot", id:1, type:Type.FILE, l:0, mode: 0, uid: system.sysUser,
+            read: async (c, count, offset) => {
+                return new Uint8Array(await (await (await fetch(bootbin)).blob()).arrayBuffer());
+            }},
+        {name: "memfs", id:1, type:Type.FILE, l:0, mode: 0, uid: system.sysUser,
+            read: async (c, count, offset) => {
+                return new Uint8Array(await (await (await fetch(memfs)).blob()).arrayBuffer());
+            }},
+    ];
+
+    const rootdir: IDirtab[] = [
+        {name: "dev", id:1, type:Type.DIR, l:0, mode: 0, atime: system.boottime, uid: system.sysUser},
+        {name: "env", id:1, type:Type.DIR, l:0, mode: 0, atime: system.boottime, uid: system.sysUser},
+        {name: "fd", id:1, type:Type.DIR, l:0, mode: 0, atime: system.boottime, uid: system.sysUser},
+        {name: "mnt", id:1, type:Type.DIR, l:0, mode: 0, atime: system.boottime, uid: system.sysUser},
+        {name: "net", id:1, type:Type.DIR, l:0, mode: 0, atime: system.boottime, uid: system.sysUser},
+        {name: "proc", id:1, type:Type.DIR, l:0, mode: 0, atime: system.boottime, uid: system.sysUser},
+        {name: "root", id:1, type:Type.DIR, l:0, mode: 0, atime: system.boottime, uid: system.sysUser},
+        {name: "srv", id:1, type:Type.DIR, l:0, mode: 0, atime: system.boottime, uid: system.sysUser},
+        {name: "boot", id:1, type:Type.DIR, l:0, mode: 0, atime: system.boottime, uid: system.sysUser, dirtab: bootdir},
+
+        // TODO: Check if this below is really needed
+        {name: "bin", id:1, type:Type.DIR, l:0, mode: 0, atime: system.boottime, uid: system.sysUser},
+        {name: "lib", id:1, type:Type.DIR, l:0, mode: 0, atime: system.boottime, uid: system.sysUser},
+    ]
+
     system.dev.registerDevice({
         id: "/",
         name: "root",
+
         operations: {
             attach: async (options, kernel) => {
-                let c = mkchannel();
+                const c = system.channels.mkchannel();
+                c.srv = "/";
                 c.type = Type.DIR;
-                c.map = mkdirtab(rootdir);
+                c.map = mkdirtabA(rootdir, kernel);
+                c.map.uid = system.sysUser;
+                c.map.atime = system.boottime;
                 c.operations = {
                     walk: walk,
                     read: read,
+                    getstat: getstat
                 }
                 return c;
             },

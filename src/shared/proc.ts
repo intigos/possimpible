@@ -1,10 +1,10 @@
-import {CreateMode, ForkMode2, MountType, OpenMode, Status} from "../public/api";
+import {CreateMode, ForkMode2, IStat, MountType, OpenMode, Status} from "../public/api";
 import {
     pack,
     packA, packBytearray,
     packDouble,
     packInt32,
-    packInt8,
+    packInt8, packStat,
     packString,
     packUInt32,
     packUInt8,
@@ -12,7 +12,7 @@ import {
     unpackA, unpackBytearray,
     unpackDouble,
     unpackInt32,
-    unpackInt8,
+    unpackInt8, unpackStat,
     unpackString,
     unpackUInt32,
     unpackUInt8
@@ -40,6 +40,7 @@ export enum MessageType {
     UNMOUNT,
     REMOVE,
     PIPE,
+    STAT,
     DIE,
 
     READ_RES = 100,
@@ -56,6 +57,7 @@ export enum MessageType {
     UNMOUNT_RES,
     REMOVE_RES,
     PIPE_RES,
+    STAT_RES,
     SIGNAL,
 }
 
@@ -84,6 +86,11 @@ export const MPDependency = (id: MessageID, name: string, code: string) =>
     pack([packInt8(MessageType.DEPENDENCY), packString(id), packString(name), packString(code)])
 export const MUDependency = (a: Uint8Array) =>
     unpackMessage(a, [unpackInt8, unpackString, unpackString, unpackString]) as [MessageID, string, string]
+
+export const MPStat = (id: MessageID, fd: FileDescriptor) =>
+    pack([packInt8(MessageType.STAT), packString(id), packInt32(fd)])
+export const MUStat = (a: Uint8Array) =>
+    unpackMessage(a, [unpackInt8, unpackString, unpackInt32]) as [MessageID, FileDescriptor]
 
 export const MPRead = (id: MessageID, fd: FileDescriptor, count: number) =>
     pack([packInt8(MessageType.READ), packString(id), packInt32(fd), packDouble(count)])
@@ -160,6 +167,11 @@ export const MPReadRes = (id: MessageID, buf: Uint8Array) =>
     pack([packInt8(MessageType.READ_RES), packString(id), packBytearray(buf)])
 export const MUReadRes = (a: Uint8Array) =>
     unpackMessage(a, [unpackInt8, unpackString, unpackBytearray]) as [MessageID, Uint8Array]
+
+export const MPStatRes = (id: MessageID, stat: IStat) =>
+    pack([packInt8(MessageType.STAT_RES), packString(id), packStat(stat)])
+export const MUStatRes = (a: Uint8Array) =>
+    unpackMessage(a, [unpackInt8, unpackString, unpackStat]) as [MessageID, Uint8Array]
 
 export const MPExecRes = (id: MessageID, pid: number) =>
     pack([packInt8(MessageType.EXEC_RES), packString(id), packUInt32(pid)])

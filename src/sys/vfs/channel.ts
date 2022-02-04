@@ -6,6 +6,8 @@ import {CreateMode, IStat, OpenMode, Type} from "../../public/api";
 
 
 export interface IChannel {
+    srv: string;
+    subsrv: number;
     parent: IChannel | null;
     name: string;
     map: any;
@@ -31,15 +33,40 @@ export interface IOperations {
     walk: (dir: IChannel, c: IChannel, name: string) => void;
 }
 
-export function mkchannel(): IChannel{
-    return {
-        parent: null,
-        name: "",
-        map: null,
-        type: Type.FILE,
-        operations: {},
-        children: [],
-        mounted: 0,
+export class ChannelManager{
+    private system: System;
+
+    constructor(system: System) {
+        this.system = system;
+    }
+
+    mkchannel(): IChannel{
+        return {
+            srv: "",
+            subsrv: 0,
+            parent: null,
+            name: "",
+            map: null,
+            type: Type.FILE,
+            operations: {},
+            children: [],
+            mounted: 0,
+        }
+    }
+
+    clone(c: IChannel){
+        const nc = this.mkchannel();
+        nc.srv = c.srv
+        nc.subsrv = c.subsrv
+        nc.parent = c.parent
+        nc.name = c.name
+        nc.map = c.map
+        nc.type = c.type
+        nc.mounted = nc.mounted;
+        nc.operations = c.operations
+        nc.children = []
+        nc.mounted = c.mounted
+        return nc;
     }
 }
 

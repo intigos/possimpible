@@ -12,3 +12,5 @@ export enum Colors {
 
 export const red = (s: string) => Colors.RED + s + Colors.ENDC;
 export const yellow = (s: string) => Colors.YELLOW + s + Colors.ENDC;
+export const cyan = (s: string) => Colors.CYAN + s + Colors.ENDC;
+export const green = (s: string) => Colors.GREEN + s + Colors.ENDC;

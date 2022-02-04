@@ -12,6 +12,7 @@ import {
 import {IChannel} from "../vfs/channel";
 import {IDirectoryEntry} from "../vfs/operations";
 import {PError, Status, Type} from "../../public/api";
+import {getstat} from "../dirtab";
 
 export function mksb(): IMemSuperNode{
     const sb = mem_alloc_superblock();
@@ -88,12 +89,14 @@ export const walk = async (dir: IChannel, c: IChannel, name: string): Promise<IC
                 c.type = Type.DIR;
                 c.operations = {
                     walk: walk,
-                    read: read
+                    read: read,
+                    getstat: getstat
                 }
             }else{
                 c.type = Type.FILE;
                 c.operations = {
-                    read: read
+                    read: read,
+                    getstat: getstat
                 }
             }
             return c;

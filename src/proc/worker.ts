@@ -5,7 +5,7 @@
  * @module worker
  */
 
-import {CreateMode, ForkMode2, ISystemCalls, MountType, OpenMode, PError, Status} from "../public/api";
+import {CreateMode, ForkMode2, IStat, ISystemCalls, MountType, OpenMode, PError, Status} from "../public/api";
 import {
     debug,
     FileDescriptor,
@@ -17,6 +17,7 @@ import {
     MUStart, MUWrite, MUWriteRes,
     peak, Signal
 } from "../shared/proc";
+import {packA, packStat, unpackA, unpackStat} from "../shared/struct";
 
 /**
  * An instance of {@link Process} is created at the start of the worker. This contains helper functions that construct
@@ -186,6 +187,23 @@ export class Process{
         const res = await this.callWithPromise(MPPipe(this.uuidv4()));
         const [_, pipefd] = MUPipeRes(res);
         return pipefd;
+    }
+
+
+    public packStat(stat: IStat): Uint8Array{
+        return packStat(stat);
+    }
+
+    public unpackStat(s: Uint8Array): IStat{
+        return unpackStat(s, 0)[0];
+    }
+
+    public packAStat(stat: IStat[]): Uint8Array{
+        return packA(stat, packStat);
+    }
+
+    public unpackAStat(s: Uint8Array): IStat[]{
+        return unpackA(unpackStat)(s, 0)[0]
     }
 
     public async entrypoint(ep: (...args: any) => any, p?: string){

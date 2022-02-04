@@ -1,12 +1,12 @@
-import {CreateMode, OpenMode, Type} from "./api";
+import {CreateMode, IStat, OpenMode, Type} from "./api";
 import {FileDescriptor} from "../shared/proc";
 import {
-    pack, packA, packBytearray, packDouble,
+    pack, packA, packBytearray, packDouble, packStat,
     packString,
     packUInt16,
     packUInt32,
     packUInt8,
-    unpack, unpackA, unpackBytearray, unpackDouble, unpackInt8, unpackString,
+    unpack, unpackA, unpackBytearray, unpackDouble, unpackInt8, unpackStat, unpackString,
     unpackUInt16,
     unpackUInt32,
     unpackUInt8
@@ -104,13 +104,18 @@ export const MUTremove = (a: Uint8Array) => unpack(a, [unpackUInt8, unpackUInt16
 export const MPRremove = (tag: Tag) => pack([packUInt8(Protocol9P.Rremove), packUInt16(tag)]);
 export const MURremove = (a: Uint8Array) => unpack(a, [unpackUInt8, unpackUInt16])  as [Protocol9P, Tag];
 
+export const MPTstat = (tag: Tag, fd: Fid) => pack([packUInt8(Protocol9P.Tstat), packUInt16(tag), packUInt32(fd)]);
+export const MUTstat = (a: Uint8Array) => unpack(a, [unpackUInt8, unpackUInt16, unpackUInt32]) as [Protocol9P, Tag, Fid];
+
+export const MPRstat = (tag: Tag, stat: IStat) => pack([packUInt8(Protocol9P.Rstat), packUInt16(tag), packStat(stat)]);
+export const MURstat = (a: Uint8Array) => unpack(a, [unpackUInt8, unpackUInt16, unpackStat])  as [Protocol9P, Tag, IStat];
+
+
 export function peak9p(a: Uint8Array){
     return unpack(a, [unpackUInt8, unpackUInt16]) as [Protocol9P, Tag]
 }
 
 
-
-type IStat = any;
 export type Fid = number;
 
 interface IOperations9P{
@@ -196,8 +201,12 @@ export class Service9P{
                         break;
                     case Protocol9P.Tremove:
                         break;
-                    case Protocol9P.Tstat:
+                    case Protocol9P.Tstat: {
+                        const [_, tag, fd] = MUTstat(message);
+                        const stat = await this.ops.stat(fd);
+                        await self.proc.sys.write(this.fd, MPRstat(tag, stat))
                         break;
+                    }
                 }
             }catch (e) {
                 await self.proc.sys.write(this.fd, MPRerror(t, e as string))

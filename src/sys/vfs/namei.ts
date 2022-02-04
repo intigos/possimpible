@@ -1,4 +1,4 @@
-import {channel_get_cache, channel_set_cache, channelmounts, IChannel, mkchannel} from "../../sys/vfs/channel";
+import {channel_get_cache, channel_set_cache, channelmounts, IChannel} from "../../sys/vfs/channel";
 import {System} from "../system";
 import {IPath} from "./path";
 import {IMount, IMountNS} from "./mount";
@@ -215,6 +215,7 @@ export class NameI{
                 nd.path.channel = nd.path.channel.parent!;
                 break;
             }
+            debugger;
             if(!this.follow_up(nd.path)){
                 break;
             }
@@ -256,7 +257,7 @@ export class NameI{
                         try{
                             let ch = channel_get_cache(mount.root, component);
                             if(!ch){
-                                ch = mkchannel()
+                                ch = this.system.channels.clone(mount.root!);
                                 await mount.root!.operations.walk?.(mount.root, ch, component)
                                 channel_set_cache(mount.root!, ch);
                             }
@@ -270,12 +271,12 @@ export class NameI{
                         throw new PError(Status.ENOENT);
                     }
                 }else{
-                    c = mkchannel();
+                    c = this.system.channels.clone(nd.path.channel);
                     await nd.path.channel!.operations.walk?.(nd.path.channel, c, component)
                     channel_set_cache(nd.path.channel, c);
                 }
             }else{
-                c = mkchannel();
+                c = this.system.channels.clone(nd.path.channel);
                 await nd.path.channel!.operations.walk?.(nd.path.channel, c, component)
                 channel_set_cache(nd.path.channel, c);
             }

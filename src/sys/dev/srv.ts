@@ -1,8 +1,7 @@
 import {ISystemModule} from "../modules";
 import {System} from "../system";
-import {IChannel, mkchannel} from "../vfs/channel";
-import {IDirectoryEntry} from "../vfs/operations";
-import {CreateMode, PError, Status, Type} from "../../public/api";
+import {IChannel} from "../vfs/channel";
+import {CreateMode, IStat, PError, Status, Type} from "../../public/api";
 import {Task} from "../proc/task";
 
 interface Srv {
@@ -10,76 +9,97 @@ interface Srv {
     c?: IChannel
 }
 
-const root: Srv[] = []
+function init(system: System){
+    const root: Srv[] = []
+    const te = new TextEncoder();
+    const td = new TextDecoder();
 
-function srvcreate(dir: IChannel, c: IChannel, name: string, mode: number){
-    if(mode & CreateMode.DIR){
+    function srvcreate(dir: IChannel, c: IChannel, name: string, mode: number){
+        if(mode & CreateMode.DIR){
+            throw new PError(Status.EPERM);
+        }
+
+        let srv = {
+            name: name,
+        };
+        c.name = name;
+        c.map = srv;
+        c.type = Type.FILE;
+        c.operations = {
+            write: srvwrite,
+            getstat: srvstat
+        }
+        root.push(srv);
+    }
+
+    async function srvread(c: IChannel, count: number, offset: number): Promise<Uint8Array>{
+        if(c.type & Type.DIR){
+            return te.encode(root.map(x => x.name).reduce((x,y) => x + "\n" + y) || "");
+        }
         throw new PError(Status.EPERM);
     }
 
-    let srv = {
-        name: name,
-    };
-    c.name = name;
-    c.map = srv;
-    c.type = Type.FILE;
-    c.operations = {
-        write: srvwrite
-    }
-    root.push(srv);
-}
-const te = new TextEncoder();
-async function srvread(c: IChannel, count: number, offset: number): Promise<Uint8Array>{
-    if(c.type & Type.DIR){
-        return te.encode(root.map(x => x.name).reduce((x,y) => x + "\n" + y) || "");
-    }
-    throw new PError(Status.EPERM);
-}
-const td = new TextDecoder();
-async function srvwrite(c: IChannel, buf: Uint8Array, offset: number){
-    let fd = parseInt(td.decode(buf));
+    async function srvwrite(c: IChannel, buf: Uint8Array, offset: number){
+        let fd = parseInt(td.decode(buf));
 
-    (c.map as Srv).c = (S.current as Task).files.fileDescriptors[fd]?.channel;
-}
-
-async function srvopen(c: IChannel, mode: number): Promise<IChannel>{
-    const s = root.find(x => x.name == c.name);
-    if(s){
-        return s.c!;
+        (c.map as Srv).c = (system.current as Task).files.fileDescriptors[fd]?.channel;
     }
-    throw new PError(Status.ENOENT)
-}
 
-async function srvwalk(dir:IChannel, c:IChannel, name: string){
-    for (const srv of root) {
-        if (srv.name == name){
-            c.parent = dir;
-            c.map = srv;
-            c.name = name;
-            c.type = Type.FILE;
-            c.operations = {
-                open: srvopen
-            }
-            return;
+    async function srvstat(c: IChannel): Promise<IStat>{
+        return {
+            srv: c.srv,
+            subsrv: c.subsrv,
+            type: c.type,
+            uid: system.sysUser,
+            mode: 0,
+            muid: system.sysUser,
+            gid: system.sysUser,
+            name: c.name,
+            mtime: system.boottime,
+            atime: system.boottime,
+            length: 0,
+        };
+    }
+
+    async function srvopen(c: IChannel, mode: number): Promise<IChannel>{
+        const s = root.find(x => x.name == c.name);
+        if(s){
+            return s.c!;
         }
+        throw new PError(Status.ENOENT)
     }
-    throw new PError(Status.ENOENT)
-}
 
-let S: System;
-function init(system: System){
-    S = system;
+    async function srvwalk(dir:IChannel, c:IChannel, name: string){
+        for (const srv of root) {
+            if (srv.name == name){
+                c.parent = dir;
+                c.map = srv;
+                c.name = name;
+                c.type = Type.FILE;
+                c.operations = {
+                    open: srvopen,
+                    getstat: srvstat
+                }
+                return;
+            }
+        }
+        throw new PError(Status.ENOENT)
+    }
+
     system.dev.registerDevice({
         id: "s",
         name: "srv",
         operations: {
             attach: async (options, system1) => {
-                let c = mkchannel();
+                const c = system.channels.mkchannel();
+                c.srv = "s";
                 c.map = root;
+                c.type = Type.DIR;
                 c.operations = {
                     read: srvread,
                     walk: srvwalk,
-                    create: srvcreate
+                    create: srvcreate,
+                    getstat: srvstat
                 }
                 return c;
             }

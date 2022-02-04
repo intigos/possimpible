@@ -1,3 +1,4 @@
+import {IStat} from "../public/api";
 
 
 type Unpacked<T> = [T, number]
@@ -142,6 +143,38 @@ export function pack(arrs: Uint8Array[]){
         p += arr.length;
     }
     return result;
+}
+
+export function packStat(stat: IStat){
+    return pack([
+        packString(stat.srv),
+        packUInt16(stat.subsrv),
+        packUInt8(stat.type),
+        packUInt32(stat.mode),
+        packUInt32(stat.atime),
+        packUInt32(stat.mtime),
+        packUInt32(stat.length),
+        packString(stat.name),
+        packString(stat.uid),
+        packString(stat.gid),
+        packString(stat.muid)
+    ])
+}
+
+export function unpackStat(s: Uint8Array, p: number): Unpacked<IStat>{
+    let stat: any = {};
+    [stat.srv, p] = unpackString(s, p);
+    [stat.subsrv, p] = unpackUInt16(s, p);
+    [stat.type, p] = unpackUInt8(s, p);
+    [stat.mode, p] = unpackUInt32(s, p);
+    [stat.atime, p] = unpackUInt32(s, p);
+    [stat.mtime, p] = unpackUInt32(s, p);
+    [stat.length, p] = unpackUInt32(s, p);
+    [stat.name, p] = unpackString(s, p);
+    [stat.uid, p] = unpackString(s, p);
+    [stat.gid, p] = unpackString(s, p);
+    [stat.muid, p] = unpackString(s, p);
+    return [stat, p];
 }
 
 export function unpack(arr: Uint8Array, pattern: Unpacker<any>[]): any[]{

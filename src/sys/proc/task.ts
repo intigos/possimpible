@@ -2,8 +2,6 @@ import {IChannel} from "../vfs/channel";
 import {INSProxy} from "../ns/ns";
 import {IPath} from "../vfs/path";
 import {pid} from "./pid";
-import {ForkMode, ForkMode2} from "../../public/api";
-import {debug, peak} from "../../shared/proc";
 
 export enum ITaskStatus {
     PENDING,
@@ -26,8 +24,8 @@ export interface ITaskFiles {
 
 export interface IProtoTask {
     pid: number,
-    uid?: number,
-    gid?: number,
+    uid: string,
+    gid: string,
     ns: INSProxy;
     root: IPath;
     pwd: IPath;
@@ -40,8 +38,8 @@ export type Enviroment = Map<string,string>;
 export class Task implements IProtoTask {
     status = ITaskStatus.RUNNGING
     pid: number;
-    uid: number;
-    gid: number;
+    uid: string;
+    gid: string;
     sys: any;
     ns: INSProxy;
     pwd: IPath;
@@ -55,7 +53,7 @@ export class Task implements IProtoTask {
     handler: (arr: Uint8Array, task: Task) => void;
     env: Enviroment;
 
-     constructor(path: IPath, argv: string[], uid: number, gid: number, pwd: IPath,
+     constructor(path: IPath, argv: string[], uid: string, gid: string, pwd: IPath,
                  root: IPath, ns: INSProxy, parentPid: number, cpu: IChannel, files: ITaskFiles,
                  env: Enviroment, handler: (arr: Uint8Array, task: Task) => void) {
         this.sys = true;

@@ -1,16 +1,16 @@
 import {System} from "../system";
-import {IChannel, mkchannel} from "../vfs/channel";
+import {IChannel} from "../vfs/channel";
 import {ISystemModule} from "../modules";
-import {OpenMode, PError, Status, Type} from "../../public/api";
+import {IStat, OpenMode, PError, Status, Type} from "../../public/api";
 import {
     MPTattach,
     MPTopen,
-    MPTread,
+    MPTread, MPTstat,
     MPTwalk, MPTwrite,
     MURattach,
     MURerror,
     MURopen,
-    MURread,
+    MURread, MURstat,
     MURwalk, MURwrite,
     peak9p,
     Protocol9P
@@ -87,6 +87,11 @@ class MountClient{
             type: result[2].pop()!,
         };
     }
+
+    async stat(node: MountRPCNode): Promise<IStat>{
+        const result = await this.mountrpc([0, node.fid],MPTstat, MURstat)
+        return result[2];
+    }
 }
 
 async function mountread(c: IChannel, count: number, offset: number): Promise<Uint8Array> {
@@ -106,6 +111,11 @@ async function mountopen(c: IChannel, mode: OpenMode) : Promise<IChannel> {
     return c;
 }
 
+async function mountstat(c: IChannel) : Promise<IStat> {
+    const node = c.map as MountRPCNode;
+    return await node.client.stat(node);
+}
+
 async function mountwalk(dir: IChannel, c1: IChannel, name: string): Promise<void> {
     const node = dir.map as MountRPCNode
     const newnode = await node.client.walk(node, [name]);
@@ -118,15 +128,19 @@ async function mountwalk(dir: IChannel, c1: IChannel, name: string): Promise<voi
             walk: mountwalk,
             open: mountopen,
             read: mountread,
+            getstat: mountstat
         }
     }else{
         c1.operations = {
             read: mountread,
             open: mountopen,
-            write: mountwrite
+            write: mountwrite,
+            getstat: mountstat
         }
     }
 }
+
+const mounts: MountClient[] = []
 
 async function init(system: System) {
     system.dev.registerDevice({
@@ -135,15 +149,19 @@ async function init(system: System) {
         operations: {
             attach: async (options, kernel) => {
                 const struct = options as { fd: IChannel, afd: IChannel, aname:string }
-                let c = mkchannel();
-                const node = await (new MountClient(struct.fd, struct.aname).attach());
+                let c = system.channels.mkchannel();
+                c.srv = "M";
+                const client = new MountClient(struct.fd, struct.aname);
+                c.subsrv = mounts.push(client);
+                const node = await client.attach();
                 c.map = node
                 c.type = node.type;
                 c.parent = null;
                 c.operations = {
                     walk: mountwalk,
                     open: mountopen,
-                    read: mountread
+                    read: mountread,
+                    getstat: mountstat
                 }
                 return c;
             },
@@ -159,5 +177,6 @@ const module: ISystemModule = {
     name: "rootfs",
     init: init,
     cleanup: cleanup
-}
+};
+
 export default module;

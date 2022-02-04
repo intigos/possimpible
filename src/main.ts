@@ -62,7 +62,7 @@ const terminal = new TerminalDevice(document.getElementById("term")!);
 
 window.onload = async () => setTimeout(async x => {
     const vm = new VirtualMachine(discover([
-        DeviceDetail("initrd0", {
+        DeviceDetail("initrd", {
             compatibility: ["storage:image"],
             image: initrd
         }),
@@ -81,8 +81,8 @@ window.onload = async () => setTimeout(async x => {
     try{
         await vm.boot(new System({
             serial: "/dev/serial",
-            root: "/dev/initrd0",
-            rootfs: "blob",
+            initrd: "#💾/initrd",
+            filesrv: "memfs",
             initrc: "/bin/init"
         }));
     }catch (e) {

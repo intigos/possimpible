@@ -1,7 +1,7 @@
 import {ISystemModule} from "../modules";
 import {System} from "../system";
-import {IDirtab, mkdirtab, read, walk} from "../dirtab";
-import {IChannel, mkchannel} from "../vfs/channel";
+import {getstat, IDirtab, mkdirtabA, read, walk} from "../dirtab";
+import {IChannel} from "../vfs/channel";
 import {Type} from "../../public/api";
 
 function init(system: System){
@@ -9,7 +9,7 @@ function init(system: System){
         probe: async (x, match) => {
             const rootdir: IDirtab[] = [
                 {
-                    name: "serial", id:1, type:Type.FILE, l:0, mode: 0,
+                    name: "serial", id:1, type:Type.FILE, l:0, mode: 0, uid: system.sysUser,
                     write: async (file, buf, offset) => {
                         return (x as any).properties.write(buf);
                     },
@@ -25,11 +25,14 @@ function init(system: System){
                 name: "serial",
                 operations: {
                     attach: async (options, system1) => {
-                        let c = mkchannel();
-                        c.map = mkdirtab(rootdir);
+                        const c = system.channels.mkchannel();
+                        c.srv = "⌨️";
+                        c.map = mkdirtabA(rootdir, system1);
+                        c.type = Type.DIR;
                         c.operations = {
                             read: read,
-                            walk: walk
+                            walk: walk,
+                            getstat: getstat
                         }
                         return c;
                     }

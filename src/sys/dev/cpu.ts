@@ -1,7 +1,7 @@
 import {System} from "../system";
-import {IChannel, mkchannel} from "../vfs/channel";
+import {IChannel} from "../vfs/channel";
 import {ISystemModule} from "../modules";
-import {IDirtab, mkdirtab, read, walk} from "../dirtab";
+import {getstat, IDirtab, mkdirtab, mkdirtabA, read, walk} from "../dirtab";
 import {Type} from "../../public/api";
 import {v4 as UUID } from 'uuid';
 import {debug, MessageType, peak} from "../../shared/proc";
@@ -18,8 +18,16 @@ class Process implements IDirtab{
     mode = 0;
     worker: Worker;
     aqueue = mkaqueue<Uint8Array>()
+    atime: number;
+    mtime: number;
+    muid: string;
+    uid: string;
 
-    constructor() {
+    constructor(system: System) {
+        this.muid = system.sysUser;
+        this.uid = system.sysUser;
+        this.atime = new Date().valueOf();
+        this.mtime = this.atime;
         this.worker = new Worker(workerImage, {
             name: "" + this.name
         });
@@ -44,34 +52,36 @@ class Process implements IDirtab{
     }
 }
 
-const cpudir: IDirtab[] = [
-    {name: "ctrl", id:1, type:Type.FILE, l:0, mode: 0,
-        read: async (c, count, offset) => {
-            const process = new Process();
-
-            cpudir.push(process);
-
-            return new TextEncoder().encode(process.name);
-        }
-    }
-];
-
-const rootdir: IDirtab[] = [
-    {name: "cpu", id:1, type:Type.DIR, l:0, mode: 0, dirtab:cpudir},
-]
-
 async function init(system: System) {
+    const cpudir: IDirtab[] = [
+        {name: "ctrl", id:1, type:Type.FILE, l:0, mode: 0, uid: system.sysUser,
+            read: async (c, count, offset) => {
+                const process = new Process(system);
+
+                cpudir.push(mkdirtab(process, system));
+
+                return new TextEncoder().encode(process.name);
+            }
+        }
+    ];
+
+    const rootdir: IDirtab[] = [
+        {name: "cpu", id:1, type:Type.DIR, l:0, mode: 0, uid:system.sysUser, dirtab:cpudir},
+    ]
+
     system.dev.registerDevice({
         id: "C",
         name: "cpu",
         operations: {
             attach: async (options, kernel) => {
-                let c = mkchannel();
+                let c = system.channels.mkchannel()
+                c.srv = "C";
                 c.type = Type.DIR;
-                c.map = mkdirtab(rootdir);
+                c.map = mkdirtabA(rootdir, kernel);
                 c.operations = {
                     walk: walk,
                     read: read,
+                    getstat: getstat
                 }
                 return c;
             },

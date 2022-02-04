@@ -1,7 +1,6 @@
 import {System} from "../system";
-import {mkchannel} from "../vfs/channel";
 import {ISystemModule} from "../modules";
-import {IDirtab, mkdirtab, read, walk} from "../dirtab";
+import {getstat, IDirtab, mkdirtabA, read, walk} from "../dirtab";
 import {dequeue, enqueue, mkaqueue} from "../aqueue";
 import {Type} from "../../public/api";
 
@@ -15,7 +14,7 @@ async function init(system: System) {
                 const queue2 = mkaqueue<Uint8Array>();
 
                 const rootdir: IDirtab[] = [
-                    {name: "data", id:1, type:Type.FILE, l:0, mode: 0,
+                    {name: "data", id:1, type:Type.FILE, l:0, mode: 0, uid: system.sysUser,
                         read: async (c1, count, offset): Promise<Uint8Array> => {
                             return await dequeue(queue1);
                         },
@@ -23,7 +22,7 @@ async function init(system: System) {
                             enqueue(queue2, buf);
                         }
                     },
-                    {name: "data1", id:1, type:Type.FILE, l:0, mode: 0,
+                    {name: "data1", id:1, type:Type.FILE, l:0, mode: 0, uid: system.sysUser,
                         read: async (c1, count, offset): Promise<Uint8Array> => {
                             return await dequeue(queue2);
                         },
@@ -33,12 +32,14 @@ async function init(system: System) {
                     }
                 ]
 
-                let c = mkchannel();
+                let c = system.channels.mkchannel();
+                c.srv = "|";
                 c.type = Type.DIR;
-                c.map = mkdirtab(rootdir);
+                c.map = mkdirtabA(rootdir, system);
                 c.operations = {
                     walk: walk,
                     read: read,
+                    getstat: getstat,
                 }
                 return c;
             },
