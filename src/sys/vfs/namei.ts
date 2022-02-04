@@ -194,7 +194,7 @@ export class NameI{
         let parent: IMount | null;
 
         parent = path.mount!.parent;
-        if (parent){
+        if (!parent){
             return 0;
         }
         let parentpath = this.system.vfs.mounts.lookupMountpoint(path.mount!);
