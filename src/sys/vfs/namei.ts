@@ -215,7 +215,7 @@ export class NameI{
                 nd.path.channel = nd.path.channel.parent!;
                 break;
             }
-            debugger;
+
             if(!this.follow_up(nd.path)){
                 break;
             }

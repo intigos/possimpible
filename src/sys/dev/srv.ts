@@ -1,7 +1,7 @@
 import {ISystemModule} from "../modules";
 import {System} from "../system";
 import {IChannel} from "../vfs/channel";
-import {CreateMode, IStat, PError, Status, Type} from "../../public/api";
+import {Perm, IStat, PError, Status, Type} from "../../public/api";
 import {Task} from "../proc/task";
 
 interface Srv {
@@ -15,19 +15,21 @@ function init(system: System){
     const td = new TextDecoder();
 
     function srvcreate(dir: IChannel, c: IChannel, name: string, mode: number){
-        if(mode & CreateMode.DIR){
+        if(mode & Perm.DIR){
             throw new PError(Status.EPERM);
         }
 
         let srv = {
             name: name,
         };
-        c.name = name;
+        c.parent = dir;
         c.map = srv;
+        c.name = name;
         c.type = Type.FILE;
         c.operations = {
-            write: srvwrite,
-            getstat: srvstat
+            open: srvopen,
+            getstat: srvstat,
+            write: srvwrite
         }
         root.push(srv);
     }

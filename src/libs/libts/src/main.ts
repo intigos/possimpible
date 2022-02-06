@@ -6,7 +6,7 @@
  * @module libts
  */
 
-import {FD_STDIN, FD_STDOUT, OpenMode, PError, Status} from "../../../public/api";
+import {FD_STDIN, FD_STDOUT, OMode, PError, Status} from "../../../public/api";
 
 
 const te = new TextEncoder()
@@ -19,16 +19,6 @@ const td = new TextDecoder();
  */
 export function print(s: string){
     self.proc.sys.write(FD_STDOUT, te.encode(s.replaceAll("\n","\n\r")));
-}
-
-/**
- * Waits for process with `pid` to finish
- *
- * @param pid  Process to wait
- */
-export async function wait(pid: number) {
-    let fd = await self.proc.sys.open("/proc/" + pid + "/run", 0);
-    await self.proc.sys.read(fd, -1);
 }
 
 /**
@@ -73,7 +63,7 @@ export async function exit(code: Status){
  * @return file contents
  */
 export async function slurp(path: string): Promise<string>{
-    let fd = await self.proc.sys.open(path, OpenMode.READ);
+    let fd = await self.proc.sys.open(path, OMode.READ);
     let content =  await self.proc.sys.read(fd, -1);
     await self.proc.sys.close(fd);
     return td.decode(content);

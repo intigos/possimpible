@@ -5,16 +5,16 @@
  * @module worker
  */
 
-import {CreateMode, ForkMode2, IStat, ISystemCalls, MountType, OpenMode, PError, Status} from "../public/api";
+import {Perm, ForkMode2, IStat, ISystemCalls, MType, OMode, PError, Status} from "../public/api";
 import {
     debug,
     FileDescriptor,
     MessageID,
     MessageType, MPBind, MPChCwd, MPClose, MPCreate, MPDie, MPExec, MPFork, MPGetCwd, MPMount, MPOpen, MPPipe,
-    MPRead, MPReady, MPRemove, MPUnmount, MPWrite, MUCreateRes,
+    MPRead, MPReady, MPRemove, MPSleep, MPUnmount, MPWait, MPWrite, MUCreateRes,
     MUDependency, MUExecRes, MUGetCwdRes, MUOpenRes, MUPipeRes,
-    MUReadRes, MURemoveRes, MUSignal,
-    MUStart, MUWrite, MUWriteRes,
+    MUReadRes, MURemoveRes, MUSignal, MUSleepRes,
+    MUStart, MUWait, MUWaitRes, MUWrite, MUWriteRes,
     peak, Signal
 } from "../shared/proc";
 import {packA, packStat, unpackA, unpackStat} from "../shared/struct";
@@ -51,7 +51,9 @@ export class Process{
         unmount: this.sys_unmount.bind(this),
         pipe: this.sys_pipe.bind(this),
         create: this.sys_create.bind(this),
-        fork: this.sys_fork.bind(this)
+        fork: this.sys_fork.bind(this),
+        wait: this.sys_wait.bind(this),
+        sleep: this.sys_sleep.bind(this)
     }
     private callsites = new Map<string, (...args: any) => any>()
 
@@ -67,7 +69,7 @@ export class Process{
         self.postMessage(MPReady(this.uuidv4()))
     }
 
-    private handleMessage(handle: MessageEvent<Uint8Array>){
+    private async handleMessage(handle: MessageEvent<Uint8Array>) {
         let message = handle.data;
         const [type, id] = peak(message);
         if (type >= MessageType.READ_RES) {
@@ -75,16 +77,19 @@ export class Process{
                 this.router.get(id)!.call(null, message);
                 this.router.delete(id);
             }
-        }else if(type == MessageType.DEPENDENCY){
+        } else if (type == MessageType.DEPENDENCY) {
             let [_, name, code] = MUDependency(message);
             (self as any)[name] = null;
             eval(code);
-        }else if(type == MessageType.START){
+        } else if (type == MessageType.START) {
             let [_, code, argv] = MUStart(message)
             this.argv = argv;
             eval(code);
             const cs = this.callsites.get("__start");
-            if(cs){ cs(argv); }
+            if (cs) {
+                await cs(argv);
+                await this.sys_die(0);
+            }
         }
     }
 
@@ -123,7 +128,7 @@ export class Process{
         return count;
     }
 
-    private async sys_open(path: string, flags: OpenMode): Promise<FileDescriptor>{
+    private async sys_open(path: string, flags: OMode): Promise<FileDescriptor>{
         const res = await this.callWithPromise(MPOpen(this.uuidv4(), path, flags));
         const [_, fd] = MUOpenRes(res);
         return fd;
@@ -165,11 +170,11 @@ export class Process{
         await this.callWithPromise(MPDie(this.uuidv4(), status));
     }
 
-    private async sys_mount(fd: FileDescriptor, afd: FileDescriptor|null, old: string, flags?:MountType, aname?: string){
+    private async sys_mount(fd: FileDescriptor, afd: FileDescriptor|null, old: string, flags?:MType, aname?: string){
         await this.callWithPromise(MPMount(this.uuidv4(), fd, afd || -1, old, aname || "", flags||0));
     }
 
-    private async sys_bind(name: string, old: string, flags?: MountType){
+    private async sys_bind(name: string, old: string, flags?: MType){
         await this.callWithPromise(MPBind(this.uuidv4(), name, old, flags || 0));
     }
 
@@ -177,8 +182,8 @@ export class Process{
         await this.callWithPromise(MPUnmount(this.uuidv4(), path));
     }
 
-    private async sys_create(path:string, mode: CreateMode): Promise<FileDescriptor>{
-       const res = await this.callWithPromise(MPCreate(this.uuidv4(), path, mode));
+    private async sys_create(path:string, mode: OMode, perm: Perm): Promise<FileDescriptor>{
+       const res = await this.callWithPromise(MPCreate(this.uuidv4(), path, mode, perm));
        const [_, fd] = MUCreateRes(res);
        return fd;
     }
@@ -189,6 +194,17 @@ export class Process{
         return pipefd;
     }
 
+    private async sys_wait(pid: number): Promise<void>{
+        const res = await this.callWithPromise(MPWait(this.uuidv4(), pid));
+        const [_] = MUWaitRes(res);
+        return;
+    }
+
+    private async sys_sleep(sleep: number): Promise<void>{
+        const res = await this.callWithPromise(MPSleep(this.uuidv4(), sleep));
+        const [_] = MUSleepRes(res);
+        return;
+    }
 
     public packStat(stat: IStat): Uint8Array{
         return packStat(stat);

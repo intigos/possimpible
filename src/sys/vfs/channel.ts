@@ -2,7 +2,7 @@ import {IDirectoryEntry} from "./operations";
 import {IMount, IMountNS} from "./mount";
 import {Channel} from "diagnostics_channel";
 import {System} from "../system";
-import {CreateMode, IStat, OpenMode, Type} from "../../public/api";
+import {Perm, IStat, OMode, Type} from "../../public/api";
 
 
 export interface IChannel {
@@ -20,9 +20,9 @@ export interface IChannel {
 export interface IOperations {
     attach: (options:any, system: System) => Promise<IChannel>;
     dettach: (c: IChannel) => void;
-    open: (c: IChannel, mode: OpenMode) => Promise<IChannel>;
+    open: (c: IChannel, mode: OMode) => Promise<IChannel>;
     close: (c: IChannel) => void;
-    create: (dir: IChannel, c:IChannel, name: string, mode: CreateMode) => void;
+    create: (dir: IChannel, c:IChannel, name: string, mode: OMode, perm: Perm) => void;
     remove: (c: IChannel) => void;
     setstat: (c: IChannel, stat: IStat) => void;
     getstat: (c: IChannel) => Promise<IStat>;

@@ -1,9 +1,10 @@
-import {CreateMode, IStat, OpenMode, Type} from "../../../public/api";
+import {IStat, OMode, Perm, Type} from "../../../public/api";
 import {Fid, Service9P} from "../../../public/9p";
 import {IMemINode, IMemSuperNode, MemData_ptr, MemDirEnt_ptr, MemINodeType} from "../../../sys/memfs/low";
+import sys from "../../../sys/dev/sys";
 
 async function slurp(s: string){
-    const fd = await self.proc.sys.open(s, OpenMode.READ);
+    const fd = await self.proc.sys.open(s, OMode.READ);
     return new TextDecoder().decode(await self.proc.sys.read(fd, -1));
 }
 
@@ -17,12 +18,12 @@ try {
     const path = self.proc.argv;
     const img = path[1];
     const name = path[2];
-    const srvfd = await syscall.create(name, CreateMode.WRITE);
+    const srvfd = await syscall.create(name, OMode.WRITE, Perm.WRITE | Perm.READ | Perm.EXCL);
 
     const pipefd = await syscall.pipe();
 
     syscall.write(srvfd, new TextEncoder().encode("" + pipefd[0]));
-
+    syscall.fork
     const zzz = await slurp(img);
     const sb: IMemSuperNode = JSON.parse(zzz);
 
@@ -41,11 +42,11 @@ try {
             return Promise.resolve(undefined);
         },
 
-        create(fid: Fid, name: string, mode: CreateMode): Promise<Type> {
+        create(fid: Fid, name: string, mode: Perm): Promise<Type> {
             throw "NI";
         },
 
-        open(fid: Fid, mode: OpenMode): Promise<Type> {
+        open(fid: Fid, mode: OMode): Promise<Type> {
             const node = srv.get(fid) as IMemINode;
             return Promise.resolve(MemINodeType.DIRECTORY ? Type.DIR : Type.FILE);
         },

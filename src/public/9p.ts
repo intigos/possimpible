@@ -1,4 +1,4 @@
-import {CreateMode, IStat, OpenMode, Type} from "./api";
+import {Perm, IStat, OMode, Type} from "./api";
 import {FileDescriptor} from "../shared/proc";
 import {
     pack, packA, packBytearray, packDouble, packStat,
@@ -68,14 +68,14 @@ export const MUTwalk = (a: Uint8Array) => unpack(a, [unpackUInt8, unpackUInt16, 
 export const MPRwalk = (tag: Tag, type: Type[]) => pack([packUInt8(Protocol9P.Rwalk), packUInt16(tag), packA(type, packUInt8)]);
 export const MURwalk = (a: Uint8Array) => unpack(a, [unpackUInt8, unpackUInt16, unpackA(unpackUInt8)])  as [Protocol9P, Tag, Type[]];
 
-export const MPTopen = (tag: Tag, fd: Fid, mode: OpenMode) => pack([packUInt8(Protocol9P.Topen), packUInt16(tag), packUInt32(fd), packUInt8(mode)]);
-export const MUTopen = (a: Uint8Array) => unpack(a, [unpackUInt8, unpackUInt16, unpackUInt32, unpackUInt8]) as [Protocol9P, Tag, Fid, OpenMode];
+export const MPTopen = (tag: Tag, fd: Fid, mode: OMode) => pack([packUInt8(Protocol9P.Topen), packUInt16(tag), packUInt32(fd), packUInt8(mode)]);
+export const MUTopen = (a: Uint8Array) => unpack(a, [unpackUInt8, unpackUInt16, unpackUInt32, unpackUInt8]) as [Protocol9P, Tag, Fid, OMode];
 
 export const MPRopen = (tag: Tag, type: Type) => pack([packUInt8(Protocol9P.Ropen), packUInt16(tag), packUInt8(type)]);
 export const MURopen = (a: Uint8Array) => unpack(a, [unpackUInt8, unpackUInt16, unpackUInt8])  as [Protocol9P, Tag, Type];
 
-export const MPTcreate = (tag: Tag, fd: Fid, name: string, mode: CreateMode) => pack([packUInt8(Protocol9P.Tcreate), packUInt16(tag), packUInt32(fd), packString(name), packDouble(mode)]);
-export const MUTcreate = (a: Uint8Array) => unpack(a, [unpackUInt8, unpackUInt16, unpackUInt32, unpackString, unpackDouble]) as [Protocol9P, Tag, Fid, string, CreateMode];
+export const MPTcreate = (tag: Tag, fd: Fid, name: string, mode: Perm) => pack([packUInt8(Protocol9P.Tcreate), packUInt16(tag), packUInt32(fd), packString(name), packDouble(mode)]);
+export const MUTcreate = (a: Uint8Array) => unpack(a, [unpackUInt8, unpackUInt16, unpackUInt32, unpackString, unpackDouble]) as [Protocol9P, Tag, Fid, string, Perm];
 
 export const MPRcreate = (tag: Tag, type: Type) => pack([packUInt8(Protocol9P.Rcreate), packUInt16(tag), packUInt8(type)]);
 export const MURcreate = (a: Uint8Array) => unpack(a, [unpackUInt8, unpackUInt16, unpackUInt8])  as [Protocol9P, Tag, Type];
@@ -120,9 +120,9 @@ export type Fid = number;
 
 interface IOperations9P{
     attach: (fid: Fid, aname: string) => Promise<Type>
-    open: (fid: Fid, mode: OpenMode) => Promise<Type>,
+    open: (fid: Fid, mode: OMode) => Promise<Type>,
     clunk: (fid: Fid) => Promise<void>,
-    create: (fid: Fid, name:string, mode:CreateMode) => Promise<Type>,
+    create: (fid: Fid, name:string, mode:Perm) => Promise<Type>,
     remove: (fid: Fid) => Promise<void>,
     wstat: (fid: Fid, s: IStat) => Promise<void>,
     stat: (fid: Fid) => Promise<IStat>,

@@ -1,9 +1,9 @@
 import {IMount, IMountNS, MountManager} from "./mount";
-import {channelmounts, IChannel} from "./channel";
+import {channel_set_cache, channelmounts, IChannel} from "./channel";
 import {Last, Lookup, NameI} from "./namei";
 import {IPath} from "./path";
 import {System} from "../system";
-import {IStat, OpenMode, PError, Status} from "../../public/api";
+import {Perm, IStat, OMode, PError, Status} from "../../public/api";
 import {IFile, IProtoTask} from "../proc/task";
 import {unpackA, unpackBytearray, unpackStat} from "../../shared/struct";
 
@@ -56,7 +56,7 @@ export class VirtualFileSystem{
         return nd.path;
     }
 
-    async open(path: IPath, mode: OpenMode): Promise<IFile>{
+    async open(path: IPath, mode: OMode): Promise<IFile>{
         if(path.channel){
             if(path.channel.operations.open) {
                 path.channel = await path.channel.operations.open(path.channel, mode)
@@ -105,21 +105,18 @@ export class VirtualFileSystem{
         return {mount:mount, channel:entry};
     }
 
-    async create(path: IPath, name:string, mode: number){
+    async create(path: IPath, name:string, mode: OMode, perm: Perm): Promise<IFile>{
         if (path.channel) {
             if(path.channel.operations.create){
                 const c = this.system.channels.clone(path.channel);
-                path.channel.operations.create(path.channel, c, name, mode);
+                path.channel.operations.create(path.channel, c, name, mode, perm);
+                channel_set_cache(path.channel, c);
                 return {
                     position: 0,
                     channel: c
                 };
-            }else{
-                throw new PError(Status.EPERM);
-            }
-        } else {
-            throw new PError(Status.ENOENT);
-        }
+            }else throw new PError(Status.EPERM);
+        } else throw new PError(Status.ENOENT);
     }
 
     async close(f: IFile) {
@@ -138,7 +135,6 @@ export class VirtualFileSystem{
                     const buf = await mount.root.operations.read!(mount.root, -1, 0);
                     a.push(...unpackA(unpackStat)(buf, 0)[0])
                 }else{
-                    debugger;
                     throw new PError(Status.EPERM);
                 }
             }

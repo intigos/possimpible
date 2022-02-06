@@ -1,7 +1,7 @@
-import {CreateMode} from "../../../public/api";
+import {OMode, Perm} from "../../../public/api";
 
 async function main(argv: string[]): Promise<number>{
-    await self.proc.sys.create(argv[1], CreateMode.DIR);
+    await self.proc.sys.create(argv[1], OMode.RDWR, Perm.DIR);
 
     return 0;
 }

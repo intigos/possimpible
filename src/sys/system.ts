@@ -20,6 +20,8 @@ import {IFile, IProtoTask} from "./proc/task";
 import cpu from "./dev/cpu";
 import {ForkMode2} from "../public/api";
 import env from "./dev/env";
+import console from "./dev/console";
+import websockets from "./dev/websockets";
 
 
 export type ISystemOptions = Record<string, string>;
@@ -96,6 +98,8 @@ export class System{
         await this.mod.installModule(mount);
         await this.mod.installModule(cpu);
         await this.mod.installModule(env);
+        await this.mod.installModule(console);
+        await this.mod.installModule(websockets);
         this.descriptions = devices;
         await this.dev.init()
         await this.setupSystemTask();

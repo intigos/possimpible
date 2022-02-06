@@ -23,12 +23,12 @@ function init(system: System){
     })
 
     system.dev.registerDevice({
-        id: "💾",
+        id: "i",
         name: "image",
         operations: {
             attach: async (options, system1) => {
                 let c = system.channels.mkchannel();
-                c.srv = "💾"
+                c.srv = "i"
                 c.map = mkdirtabA(rootdir, system1);
                 c.type = Type.DIR
                 c.operations = {

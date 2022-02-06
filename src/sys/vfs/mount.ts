@@ -1,7 +1,7 @@
 import {IChannel} from "./channel";
 import {IPath} from "./path";
 import {System} from "../system";
-import {MountType} from "../../public/api";
+import {MType} from "../../public/api";
 
 export interface IMount {
     root: IChannel;
@@ -68,7 +68,7 @@ export class MountManager{
         }
     }
 
-    create(mountpoint: IChannel, root: IChannel, parent: IMount|null, flags:MountType, ns:IMountNS): IMount{
+    create(mountpoint: IChannel, root: IChannel, parent: IMount|null, flags:MType, ns:IMountNS): IMount{
         let parentMount: IMountEntry|null = ns.mounts.find(x => x.mount == parent) || null;
 
         const vfsmount:IMountEntry = {
@@ -82,13 +82,15 @@ export class MountManager{
             children: [],
         }
         switch (flags) {
-            case MountType.REPL:
-            case MountType.BEFORE:
-                ns.mounts.unshift(vfsmount);
-                break;
-            case MountType.AFTER:
+            case MType.AFTER:
                 ns.mounts.push(vfsmount);
                 break;
+            case MType.REPL:
+            case MType.BEFORE:
+            default:
+                ns.mounts.unshift(vfsmount);
+                break;
+
         }
 
         if(parent){

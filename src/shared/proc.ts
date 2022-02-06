@@ -1,4 +1,4 @@
-import {CreateMode, ForkMode2, IStat, MountType, OpenMode, Status} from "../public/api";
+import {Perm, ForkMode2, IStat, MType, OMode, Status} from "../public/api";
 import {
     pack,
     packA, packBytearray,
@@ -41,6 +41,8 @@ export enum MessageType {
     REMOVE,
     PIPE,
     STAT,
+    WAIT,
+    SLEEP,
     DIE,
 
     READ_RES = 100,
@@ -58,7 +60,10 @@ export enum MessageType {
     REMOVE_RES,
     PIPE_RES,
     STAT_RES,
+    WAIT_RES,
+    SLEEP_RES,
     SIGNAL,
+
 }
 
 export enum Signal{
@@ -107,15 +112,15 @@ export const MPPipeRes = (id: MessageID, fd: FileDescriptor[]) =>
 export const MUPipeRes = (a: Uint8Array) =>
     unpackMessage(a, [unpackInt8, unpackString, unpackA(unpackInt32)]) as [MessageID, FileDescriptor[]]
 
-export const MPBind = (id: MessageID, name: string, old: string, flags: MountType) =>
+export const MPBind = (id: MessageID, name: string, old: string, flags: MType) =>
     pack([packInt8(MessageType.BIND), packString(id), packString(name), packString(old), packUInt32(flags)])
 export const MUBind = (a: Uint8Array) =>
-    unpackMessage(a, [unpackInt8, unpackString, unpackString, unpackString, unpackUInt32]) as [MessageID, string, string, MountType]
+    unpackMessage(a, [unpackInt8, unpackString, unpackString, unpackString, unpackUInt32]) as [MessageID, string, string, MType]
 
-export const MPMount = (id: MessageID, fd: FileDescriptor, afd: FileDescriptor, old: string, aname:string, flags: MountType) =>
+export const MPMount = (id: MessageID, fd: FileDescriptor, afd: FileDescriptor, old: string, aname:string, flags: MType) =>
     pack([packInt8(MessageType.MOUNT), packString(id), packInt32(fd), packInt32(afd), packString(old), packString(aname), packUInt32(flags)])
 export const MUMount = (a: Uint8Array) =>
-    unpackMessage(a, [unpackInt8, unpackString, unpackInt32, unpackInt32, unpackString, unpackString, unpackUInt32]) as [MessageID, FileDescriptor, FileDescriptor, string, string, MountType]
+    unpackMessage(a, [unpackInt8, unpackString, unpackInt32, unpackInt32, unpackString, unpackString, unpackUInt32]) as [MessageID, FileDescriptor, FileDescriptor, string, string, MType]
 
 export const MPStart = (id: MessageID, code: string, args: string[]) =>
     pack([packInt8(MessageType.START), packString(id), packString(code), packA(args, packString)])
@@ -135,23 +140,33 @@ export const MUFork = (a: Uint8Array) =>
 export const MPForkRes = (id: MessageID, pid: number) =>
     pack([packInt8(MessageType.FORK_RES), packString(id), packUInt32(pid)])
 export const MUForkRes = (a: Uint8Array) =>
-    unpackMessage(a, [unpackInt8, unpackString, unpackUInt32]) as [MessageID, string, string[]]
+    unpackMessage(a, [unpackInt8, unpackString, unpackUInt32]) as [MessageID, string, number]
 
+
+export const MPWait = (id: MessageID, pid:number) =>
+    pack([packInt8(MessageType.FORK), packString(id), packUInt32(pid)])
+export const MUWait = (a: Uint8Array) =>
+    unpackMessage(a, [unpackInt8, unpackString, unpackUInt32]) as [MessageID, number]
+
+export const MPSleep = (id: MessageID, pid:number) =>
+    pack([packInt8(MessageType.SLEEP), packString(id), packUInt32(pid)])
+export const MUSleep = (a: Uint8Array) =>
+    unpackMessage(a, [unpackInt8, unpackString, unpackUInt32]) as [MessageID, number]
 
 export const MPExec = (id: MessageID, code: string, args: string[]) =>
     pack([packInt8(MessageType.EXEC), packString(id), packString(code), packA(args, packString)])
 export const MUExec = (a: Uint8Array) =>
     unpackMessage(a, [unpackInt8, unpackString, unpackString, unpackA(unpackString)]) as [MessageID, string, string[]]
 
-export const MPOpen = (id: MessageID, file: string, mode: OpenMode) =>
+export const MPOpen = (id: MessageID, file: string, mode: OMode) =>
     pack([packInt8(MessageType.OPEN), packString(id), packString(file), packUInt32(mode)])
 export const MUOpen = (a: Uint8Array) =>
-    unpackMessage(a, [unpackInt8, unpackString, unpackString, unpackUInt32]) as [MessageID, string, OpenMode]
+    unpackMessage(a, [unpackInt8, unpackString, unpackString, unpackUInt32]) as [MessageID, string, OMode]
 
-export const MPCreate = (id: MessageID, file: string, mode: CreateMode) =>
-    pack([packInt8(MessageType.CREATE), packString(id), packString(file), packDouble(mode)])
+export const MPCreate = (id: MessageID, file: string, mode: OMode, perm: Perm) =>
+    pack([packInt8(MessageType.CREATE), packString(id), packString(file), packDouble(mode), packDouble(perm)])
 export const MUCreate = (a: Uint8Array) =>
-    unpackMessage(a, [unpackInt8, unpackString, unpackString, unpackDouble]) as [MessageID, string, CreateMode]
+    unpackMessage(a, [unpackInt8, unpackString, unpackString, unpackDouble, unpackDouble]) as [MessageID, string, OMode, Perm]
 
 export const MPSignal = (id: MessageID, signal: Signal, arg: number) =>
     pack([packInt8(MessageType.SIGNAL), packString(id), packUInt8(signal), packUInt8(arg)])
@@ -232,7 +247,10 @@ export const MPBindRes = packAnswer(MessageType.BIND_RES)
 export const MUBindRes = unpackAnswer
 export const MPReady = packAnswer(MessageType.READY)
 export const MUReady = unpackAnswer
-
+export const MPWaitRes = packAnswer(MessageType.WAIT_RES)
+export const MUWaitRes = unpackAnswer
+export const MPSleepRes = packAnswer(MessageType.SLEEP_RES)
+export const MUSleepRes = unpackAnswer
 
 export function debug(a: Uint8Array){
     const [type, id] = peak(a);
@@ -336,6 +354,12 @@ export function debug(a: Uint8Array){
             break;
         case MessageType.FORK_RES:
             result = MUForkRes(a);
+            break;
+        case MessageType.WAIT:
+            result = MUWait(a);
+            break;
+        case MessageType.WAIT_RES:
+            result = MUWaitRes(a);
             break;
     }
 

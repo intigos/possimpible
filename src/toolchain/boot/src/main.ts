@@ -1,5 +1,6 @@
-import {MountType, OpenMode} from "../../../public/api";
-import {Colors, yellow} from "../../../sys/colors";
+import {MType, OMode} from "../../../public/api";
+import {yellow} from "../../../sys/colors";
+import sys from "../../../sys/dev/sys";
 
 async function main (args: string[]){
     let syscall = self.proc.sys;
@@ -16,6 +17,9 @@ async function main (args: string[]){
     await syscall.bind("#s", "/srv");
     await syscall.bind("#e", "/env");
     await syscall.bind("#⌨️", "/dev");
+    await syscall.bind("#🐛️", "/dev");
+
+    await syscall.bind("#w", "/net/ws", MType.CREATE);
 
     await syscall.bind(options.get("serial")!, "/dev/cons");
     await syscall.bind(options.get("serial")!, "/dev/scancode");
@@ -29,20 +33,21 @@ async function main (args: string[]){
     for(const x of options.keys()){
         syscall.write(0, te.encode(x + "=" + options.get(x) + " "));
     }
-    syscall.write(0, te.encode("\n\r\n\r"));
+    syscall.write(0, te.encode("\n\r"));
 
 
     await syscall.write(0, te.encode("Starting " + options.get("filesrv") + " of " + options.get("initrd") + "\n\r"));
     await syscall.fork("/boot/" + options.get("filesrv"), [options.get("initrd")!, "/srv/initrd"], 0);
 
-    setTimeout(async x => {
-        await syscall.write(0, te.encode("Mounting initrd into /root\n\r"));
-        const fd = await syscall.open("/srv/initrd", OpenMode.RDWR)
-        await syscall.mount(fd, null, "/root", MountType.REPL);
-        await syscall.bind("/root/bin", "/bin");
-        await syscall.bind("/root/lib", "/lib");
-        await syscall.exec(options.get("initrc")!, []);
-    }, 1000);
+    await syscall.sleep(1000);
+
+    await syscall.write(0, te.encode("Mounting /srv/initrd into /mnt/initrd\n\r"));
+    const fd = await syscall.open("/srv/initrd", OMode.RDWR)
+    await syscall.mount(fd, null, "/mnt/initrd", MType.CREATE);
+    await syscall.bind("/mnt/initrd/bin", "/bin", MType.CREATE);
+    await syscall.bind("/mnt/initrd/lib", "/lib", MType.CREATE);
+    let pid = await syscall.exec(options.get("initrc")!, []);
+    await syscall.wait(pid);
 }
 
 self.proc.entrypoint(main);

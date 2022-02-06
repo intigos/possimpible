@@ -74,6 +74,8 @@ function paintName(s: IStat, name?: string){
         return green(name || s.name)
     }else if(s.type == Type.FILE && s.srv == "C"){
         return red(name || s.name)
+    }else{
+        return s.name;
     }
 }
 

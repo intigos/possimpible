@@ -44,7 +44,7 @@ export class Task implements IProtoTask {
     ns: INSProxy;
     pwd: IPath;
     root: IPath;
-    waits: ((value: (string | PromiseLike<string>)) => void)[];
+    waits: ((value: (void | PromiseLike<void>)) => void)[];
     path: IPath;
     argv: string[];
     files: ITaskFiles;
@@ -110,5 +110,8 @@ export class Task implements IProtoTask {
         await this.cpu.operations.remove?.(this.cpu);
         this.status = ITaskStatus.STOP
         this.ns.pid.dettach(this);
+        for (const wait of this.waits) {
+            wait()
+        }
     }
 }

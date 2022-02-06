@@ -1,5 +1,5 @@
 import {IChannel, IOperations} from "./vfs/channel";
-import {IStat, PError, Status, Type} from "../public/api";
+import {IStat, OMode, Perm, PError, Status, Type} from "../public/api";
 import {packA, packStat} from "../shared/struct";
 import {System} from "./system";
 
@@ -13,6 +13,8 @@ export interface IDirtab{
     mode: number,
     atime?: number,
     mtime?: number,
+
+    create?: IOperations["create"],
     read?: IOperations["read"],
     write?: IOperations["write"]
     remove?: IOperations["remove"]
@@ -26,6 +28,20 @@ export function mkdirtab(dirtab: IDirtab, system: System): IDirtab{
     dirtab.muid = dirtab.muid || system.sysUser;
     dirtab.uid = dirtab.uid || system.sysUser;
     return dirtab;
+}
+
+export function clonedirtab(dirtab: IDirtab){
+    return {
+        muid: dirtab.muid,
+        uid: dirtab.uid,
+        name: dirtab.name,
+        id: dirtab.id,
+        type: dirtab.type,
+        l: dirtab.l,
+        mode: dirtab.mode,
+        attach: dirtab.atime,
+        mtime: dirtab.mtime
+    };
 }
 
 export function mkdirtabA(dirtab: IDirtab[] | (() => IDirtab[]), system: System): IDirtab{
@@ -49,8 +65,8 @@ const te = new TextEncoder()
 export const read = async (c: IChannel, count: number, offset: number): Promise<Uint8Array> => {
     const dirtab = (c.map as IDirtab);
     if(c.type & Type.DIR){
+        let d: IDirtab[] = [];
         if (dirtab.dirtab){
-            let d: IDirtab[];
             if({}.toString.call(dirtab.dirtab) === '[object Function]'){
                 d = (dirtab.dirtab as any)();
             }else{
@@ -61,9 +77,9 @@ export const read = async (c: IChannel, count: number, offset: number): Promise<
                 d = (d as any)() as IDirtab[];
             }
             return packA(d.map(x => dirtab2stat(x, c)), packStat);
-        }else{
-            return te.encode("");
         }
+
+        return packA(d.map(x => dirtab2stat(x, c)), packStat);
     }else{
         const read = dirtab.read;
         if(read){
@@ -95,6 +111,52 @@ export const getstat = async (c: IChannel): Promise<IStat> => {
     return dirtab2stat(dirtab, c);
 }
 
+export const create = (dir: IChannel, c: IChannel, name: string, mode: OMode, perm: Perm) => {
+    let dirtab: IDirtab = clonedirtab(dir.map);
+    let parent: IDirtab = dir.map as IDirtab;
+    if(parent.type != Type.DIR) throw new PError(Status.EPERM);
+    if (perm & Perm.DIR) {
+        dirtab.type = Type.DIR
+        dirtab.dirtab = []
+    } else {
+        dirtab.type = Type.FILE
+        dirtab.dirtab = undefined;
+    }
+    dirtab.name = name;
+    c.map = dirtab;
+    c.type = dirtab.type;
+    c.name = name;
+    c.parent = dir;
+    dirtab.id = 100;
+    if(!parent.dirtab){
+        parent.dirtab = [dirtab]
+    }else{
+        if(parent.dirtab instanceof Function){
+            throw new PError(Status.EPERM);
+        }else{
+            parent.dirtab.push(dirtab);
+        }
+    }
+    if(dirtab.type == Type.FILE){
+        c.operations = {
+            read: dirtab.read,
+            write: dirtab.write,
+            getstat: getstat
+        }
+    }else{
+        c.operations = {
+            walk: walk,
+            read: read,
+            getstat: getstat,
+            create: create
+        }
+    }
+}
+
+export const remove: IOperations["remove"] = (dir: IChannel) => {
+
+}
+
 export const walk = async (dir: IChannel, c: IChannel, name: string): Promise<IChannel> => {
     if(dir.map.dirtab){
         let dirtab = dir.map.dirtab;
@@ -110,7 +172,7 @@ export const walk = async (dir: IChannel, c: IChannel, name: string): Promise<IC
                 c.parent = dir;
                 if(tab.type == Type.FILE){
                     c.operations = {
-                        read: read,
+                        read: tab.read,
                         write: tab.write,
                         getstat: getstat
                     }
@@ -118,7 +180,8 @@ export const walk = async (dir: IChannel, c: IChannel, name: string): Promise<IC
                     c.operations = {
                         walk: walk,
                         read: read,
-                        getstat: getstat
+                        getstat: getstat,
+                        create: create
                     }
                 }
                 return c;

@@ -1,8 +1,9 @@
 import {System} from "../system";
 import {IChannel} from "../vfs/channel";
 import {ISystemModule} from "../modules";
-import {IStat, OpenMode, PError, Status, Type} from "../../public/api";
+import {IStat, OMode, PError, Status, Type} from "../../public/api";
 import {
+    MPRerror,
     MPTattach,
     MPTopen,
     MPTread, MPTstat,
@@ -63,7 +64,7 @@ class MountClient{
         };
     }
 
-    async open(node: MountRPCNode, mode: OpenMode): Promise<MountRPCNode>{
+    async open(node: MountRPCNode, mode: OMode): Promise<MountRPCNode>{
         await this.mountrpc([0, node.fid, mode], MPTopen, MURopen);
         return node;
     }
@@ -105,7 +106,7 @@ async function mountwrite(c: IChannel, buf: Uint8Array, offset: number): Promise
     return await node.client.write(node, offset, buf);
 }
 
-async function mountopen(c: IChannel, mode: OpenMode) : Promise<IChannel> {
+async function mountopen(c: IChannel, mode: OMode) : Promise<IChannel> {
     const node = c.map as MountRPCNode;
     await node.client.open(node, mode);
     return c;

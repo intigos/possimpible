@@ -4,7 +4,7 @@ import {ISystemModule} from "../modules";
 import bootbin from "&/bin/boot.img";
 // @ts-ignore
 import memfs from "&/bin/memfs.img";
-import {getstat, IDirtab, mkdirtabA, read, walk} from "../dirtab";
+import {create, getstat, IDirtab, mkdirtabA, read, walk} from "../dirtab";
 import {Type} from "../../public/api";
 
 async function init(system: System) {
@@ -20,19 +20,15 @@ async function init(system: System) {
     ];
 
     const rootdir: IDirtab[] = [
-        {name: "dev", id:1, type:Type.DIR, l:0, mode: 0, atime: system.boottime, uid: system.sysUser},
-        {name: "env", id:1, type:Type.DIR, l:0, mode: 0, atime: system.boottime, uid: system.sysUser},
-        {name: "fd", id:1, type:Type.DIR, l:0, mode: 0, atime: system.boottime, uid: system.sysUser},
-        {name: "mnt", id:1, type:Type.DIR, l:0, mode: 0, atime: system.boottime, uid: system.sysUser},
-        {name: "net", id:1, type:Type.DIR, l:0, mode: 0, atime: system.boottime, uid: system.sysUser},
-        {name: "proc", id:1, type:Type.DIR, l:0, mode: 0, atime: system.boottime, uid: system.sysUser},
-        {name: "root", id:1, type:Type.DIR, l:0, mode: 0, atime: system.boottime, uid: system.sysUser},
-        {name: "srv", id:1, type:Type.DIR, l:0, mode: 0, atime: system.boottime, uid: system.sysUser},
-        {name: "boot", id:1, type:Type.DIR, l:0, mode: 0, atime: system.boottime, uid: system.sysUser, dirtab: bootdir},
-
-        // TODO: Check if this below is really needed
-        {name: "bin", id:1, type:Type.DIR, l:0, mode: 0, atime: system.boottime, uid: system.sysUser},
-        {name: "lib", id:1, type:Type.DIR, l:0, mode: 0, atime: system.boottime, uid: system.sysUser},
+        {name: "dev", id:1, type:Type.DIR, l:0, mode:0, create: create},
+        {name: "env", id:1, type:Type.DIR, l:0, mode:0, create: create},
+        {name: "fd", id:1, type:Type.DIR, l:0, mode:0, create: create},
+        {name: "mnt", id:1, type:Type.DIR, l:0, mode:0, create: create},
+        {name: "net", id:1, type:Type.DIR, l:0, mode:0, create: create},
+        {name: "proc", id:1, type:Type.DIR, l:0, mode:0, create: create},
+        {name: "root", id:1, type:Type.DIR, l:0, mode:0, create: create},
+        {name: "srv", id:1, type:Type.DIR, l:0, mode:0, create: create},
+        {name: "boot", id:1, type:Type.DIR, l:0, mode:0, create: create, dirtab: bootdir},
     ]
 
     system.dev.registerDevice({
@@ -50,6 +46,7 @@ async function init(system: System) {
                 c.operations = {
                     walk: walk,
                     read: read,
+                    create: create,
                     getstat: getstat
                 }
                 return c;

@@ -1,6 +1,6 @@
-import {FD_STDIN, FD_STDOUT, PError, Status} from "../../../public/api";
+import {FD_STDIN, ForkMode2, PError, Status} from "../../../public/api";
 import stringToArgv from "string-to-argv";
-import {wait, exit as die, print} from "libts";
+import {exit as die, print} from "libts";
 import {ls} from "./ls";
 
 let syscall = self.proc.sys;
@@ -11,7 +11,7 @@ setTimeout(async () => {
     let cwd = await syscall.getcwd();
     const exit = false;
     let buf = "";
-    print("psh \n\r\n\r")
+    print("\n\r")
     print(cwd + " $ ")
     while (!exit) {
         let char = td.decode(await self.proc.sys.read(FD_STDIN, 1));
@@ -41,8 +41,8 @@ setTimeout(async () => {
                     cmd = "/bin/" + cmd;
                 }
                 try{
-                    let pid = await syscall.exec(cmd, argv.slice(1));
-                    await wait(pid)
+                    let pid = await syscall.fork(cmd, argv.slice(1), ForkMode2.COPY_FD);
+                    await syscall.wait(pid)
                 }catch (e) {
                     let msg;
                     const code =(e as PError).code;

@@ -4,7 +4,7 @@ export const FD_STDIN = 0;
 export const FD_STDOUT = 1;
 export const FD_STDERR = 2;
 
-export enum CreateMode {
+export enum Perm {
     DIR = 0x80000000,	 /* mode bit for directories */
     APPEND = 0x40000000, /* mode bit for append only files */
     EXCL = 0x20000000,	 /* mode bit for exclusive use files */
@@ -16,14 +16,14 @@ export enum CreateMode {
     EXEC = 0x1,  /* mode bit for execute permission */
 }
 
-export enum MountType {
-    REPL = 0x0000,	/* mount replaces object */
+export enum MType {
+    REPL = 0x0000,	    /* mount replaces object */
     BEFORE = 0x0001,	/* mount goes before others in union directory */
-    AFTER = 0x0002,	/* mount goes after others in union directory */
+    AFTER = 0x0002,	    /* mount goes after others in union directory */
     CREATE = 0x0004,	/* permit creation in mounted directory */
 }
 
-export enum OpenMode {
+export enum OMode {
     READ = 0x1,
     WRITE = 0x2,
     RDWR = 0x3,
@@ -191,10 +191,11 @@ export enum Status {
     ENOTRECOVERABLE = 131,	//State not recoverable
 }
 
-export class PError {
+export class PError extends Error{
     public code: Status;
 
     constructor(code: Status) {
+        super(Status[code]);
         this.code = code;
         Object.setPrototypeOf(this, PError.prototype);
     }
@@ -203,8 +204,8 @@ export class PError {
 export interface ISystemCalls {
     read: (fd: FileDescriptor, count: number) => Promise<Uint8Array>,
     write: (fd: FileDescriptor, buf: Uint8Array) => void,
-    open: (path: string, flags: OpenMode) => Promise<FileDescriptor>,
-    create: (path: string, mode: CreateMode) => Promise<FileDescriptor>,
+    open: (path: string, flags: OMode) => Promise<FileDescriptor>,
+    create: (path: string, mode: OMode, perm: Perm) => Promise<FileDescriptor>,
     remove: (path: string) => void,
     getcwd: () => Promise<string>,
     close: (fd: FileDescriptor) => void,
@@ -214,8 +215,10 @@ export interface ISystemCalls {
     die: (status: number) => Promise<void>
     mount: (fd: FileDescriptor, afd: FileDescriptor|null, old: string, flags?:number, aname?: string) => Promise<void>
     unmount: (path: string) => Promise<void>
-    bind: (name: string, old: string, flags?: MountType) => Promise<void>
+    bind: (name: string, old: string, flags?: MType) => Promise<void>
     pipe: () => Promise<FileDescriptor[]>,
+    wait: (pid: number) => Promise<void>,
+    sleep: (sleep: number) => Promise<void>,
 }
 
 
@@ -235,7 +238,7 @@ export interface IStat {
     subsrv: number;    /* server subtype */
     type: Type;
     /* file data */
-    mode: number;   /* permissions */
+    mode: Perm;   /* permissions */
     atime: number;    /* last read time */
     mtime: number;    /* last write time */
     length: number; /* file length */

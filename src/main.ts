@@ -81,7 +81,7 @@ window.onload = async () => setTimeout(async x => {
     try{
         await vm.boot(new System({
             serial: "/dev/serial",
-            initrd: "#💾/initrd",
+            initrd: "#i/initrd",
             filesrv: "memfs",
             initrc: "/bin/init"
         }));
