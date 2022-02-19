@@ -1,7 +1,9 @@
 import {System} from "../system";
 import {ISystemModule} from "../modules";
-import {getstat, IDirtab, mkdirtab, mkdirtabA, read, walk} from "../dirtab";
-import {Type} from "../../public/api";
+import {create, getstat, IDirtab, mkdirtab, mkdirtabA, read, walk} from "../dirtab";
+import {OMode, Perm, Type} from "../../public/api";
+import {IChannel} from "../vfs/channel";
+import {Task} from "../proc/task";
 
 
 function gendirtab(system: System){
@@ -10,14 +12,20 @@ function gendirtab(system: System){
     for(const key of task?.env!.keys()!){
         const f: IDirtab = {name: key, id:1, type:Type.FILE, l:0, mode: 0, uid:task.uid,
             read:async (c, count, offset): Promise<Uint8Array> => {
-                const task =  system.current;
+                const task = system.current;
                 return new TextEncoder().encode(task?.env.get(c.name));
+            },
+            write:(c, buf, offset) => {
+                const task = system.current;
+                task?.env.set(c.name, new TextDecoder().decode(buf))
             }
         };
         result.push(mkdirtab(f, system));
     }
     return result;
 }
+
+
 
 async function init(system: System) {
     system.dev.registerDevice({
@@ -32,7 +40,12 @@ async function init(system: System) {
                 c.operations = {
                     walk: walk,
                     read: read,
-                    getstat: getstat
+                    getstat: getstat,
+                    create: (dir, c1, name, mode, perm) => {
+                        create(dir, c1, name, mode, perm);
+                        const task = system.current;
+                        task?.env.set(name, "");
+                    }
                 }
                 return c;
             },
@@ -45,7 +58,7 @@ function cleanup(){
 }
 
 const module: ISystemModule = {
-    name: "rootfs",
+    name: "env",
     init: init,
     cleanup: cleanup
 }

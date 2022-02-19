@@ -4,8 +4,11 @@ import {System} from "../system";
 import {MType} from "../../public/api";
 
 export interface IMount {
-    root: IChannel;
+    root: IPath;
     parent: IMount|null;
+    bind: boolean;
+    mountlocation?: string;
+    flags: MType;
     mountpoint: IChannel;
 }
 
@@ -53,7 +56,7 @@ export class MountManager{
     async deleteNS(ns: IMountNS) {
         for (const mount of ns.mounts) {
             if (--mount.ns == 0) {
-                await this.#system.vfs.unmount(mount.mount, ns, mount.mount.root);
+                await this.#system.vfs.unmount(mount.mount, ns, mount.mount.root.channel);
             }
         }
         if (ns.parent) {
@@ -68,7 +71,7 @@ export class MountManager{
         }
     }
 
-    create(mountpoint: IChannel, root: IChannel, parent: IMount|null, flags:MType, ns:IMountNS): IMount{
+    create(mountpoint: IChannel, root: IPath, parent: IMount|null, bind: boolean, flags:MType, ns:IMountNS): IMount{
         let parentMount: IMountEntry|null = ns.mounts.find(x => x.mount == parent) || null;
 
         const vfsmount:IMountEntry = {
@@ -77,6 +80,8 @@ export class MountManager{
             mount: {
                 parent: parent,
                 root: root,
+                bind,
+                flags,
                 mountpoint,
             },
             children: [],
@@ -103,7 +108,7 @@ export class MountManager{
 
     delete(mountpoint: IChannel, root: IChannel, ns:IMountNS){
         for (let i of ns.mounts){
-            if(i.mount.root == root && i.mount.mountpoint == mountpoint){
+            if(i.mount.root.channel == root && i.mount.mountpoint == mountpoint){
                 const a = i.parent?.children!;
                 let index = a.indexOf(i);
                 if (index > -1) {
@@ -134,7 +139,7 @@ export class MountManager{
         for (let pathElement of ns.mounts) {
             if(pathElement.mount.mountpoint == path.channel && pathElement.parent?.mount == path.mount){
                 return {
-                    channel: pathElement.mount.root,
+                    channel: pathElement.mount.root.channel,
                     mount: pathElement.mount
                 };
             }

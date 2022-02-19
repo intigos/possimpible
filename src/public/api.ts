@@ -1,8 +1,8 @@
-import {FileDescriptor} from "../shared/proc";
-
 export const FD_STDIN = 0;
 export const FD_STDOUT = 1;
 export const FD_STDERR = 2;
+
+export type FileDescriptor = number;
 
 export enum Perm {
     DIR = 0x80000000,	 /* mode bit for directories */
@@ -213,7 +213,7 @@ export interface ISystemCalls {
     fork: (path: string, argv: string[], mode: ForkMode2) => Promise<number>
     chcwd: (path: string) => void;
     die: (status: number) => Promise<void>
-    mount: (fd: FileDescriptor, afd: FileDescriptor|null, old: string, flags?:number, aname?: string) => Promise<void>
+    mount: (fd: FileDescriptor, afd: FileDescriptor|null, old: string, flags?:MType, aname?: string) => Promise<void>
     unmount: (path: string) => Promise<void>
     bind: (name: string, old: string, flags?: MType) => Promise<void>
     pipe: () => Promise<FileDescriptor[]>,

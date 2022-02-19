@@ -45,15 +45,14 @@ export function clonedirtab(dirtab: IDirtab){
 }
 
 export function mkdirtabA(dirtab: IDirtab[] | (() => IDirtab[]), system: System): IDirtab{
-    let d;
-    if({}.toString.call(dirtab) === '[object Function]'){
-        d = dirtab;
-    }else{
-        d = (dirtab as IDirtab[]).map(x => mkdirtab(x, system));
+    if(!(dirtab instanceof Function)){
+        for (const x of dirtab){
+            mkdirtab(x, system);
+        }
     }
 
     return mkdirtab({
-        dirtab: d,
+        dirtab: dirtab,
         id: 0,
         l: 0,
         mode: 0,
@@ -90,6 +89,7 @@ export const read = async (c: IChannel, count: number, offset: number): Promise<
 }
 
 function dirtab2stat(dirtab: IDirtab, c: IChannel): IStat {
+
     return {
         atime: dirtab.atime || 0,
         length: dirtab.l,

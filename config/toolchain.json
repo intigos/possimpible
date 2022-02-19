@@ -1,21 +1,12 @@
 {
-  "libs": [
-    "libts"
-  ],
   "execs": [
-    "cat",
-    "init",
-    "login",
-    "psh",
-    "mount",
-    "umount",
-    "mkdir",
-    "rmdir",
     "boot",
-    "memfs"
+    "memfs",
+    "11pclient"
   ],
   "exclude": [
     "boot",
+    "11pclient",
     "memfs"
   ]
 }

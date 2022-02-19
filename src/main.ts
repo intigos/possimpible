@@ -2,9 +2,6 @@ import {Terminal} from "xterm";
 import {FitAddon} from "xterm-addon-fit";
 import * as XtermWebfont from 'xterm-webfont'
 import "xterm/css/xterm.css";
-
-// @ts-ignore
-import initrd from "&/initrd.img";
 import {DeviceDetail, discover} from "./vm/devicetree";
 import {VirtualMachine} from "./vm/vm";
 import {System} from "./sys/system";
@@ -60,17 +57,28 @@ class TerminalDevice{
 
 const terminal = new TerminalDevice(document.getElementById("term")!);
 
+// style node
+const head = document.head || document.getElementsByTagName('head')[0],
+    style = document.createElement('style');
+head.appendChild(style);
+const textNode = document.createTextNode("")
+style.appendChild(textNode)
+
 window.onload = async () => setTimeout(async x => {
     const vm = new VirtualMachine(discover([
-        DeviceDetail("initrd", {
-            compatibility: ["storage:image"],
-            image: initrd
-        }),
-
         DeviceDetail("serial", {
             compatibility: ["serial:terminal"],
             write: (buf: string) => terminal.write(buf),
-            read: (count: number) => terminal.read(count)
+            read: (count: number) => terminal.read(count),
+            visibility: (h: boolean) => {
+                document.getElementById("term")!.style.display = "none";
+            }
+        }),
+
+        DeviceDetail("browser", {
+            compatibility: ["display:browser"],
+            root: document.body,
+            style: textNode
         }),
 
         DeviceDetail("console", {
@@ -80,9 +88,11 @@ window.onload = async () => setTimeout(async x => {
     ]));
     try{
         await vm.boot(new System({
-            serial: "/dev/serial",
-            initrd: "#i/initrd",
-            filesrv: "memfs",
+            serial: "/dev/serial/data",
+            filesrv: "11pclient",
+            mountpoint: "helix",
+            remote: "ws://localhost:5000",
+            share: "startup",
             initrc: "/bin/init"
         }));
     }catch (e) {

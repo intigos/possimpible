@@ -19,7 +19,7 @@ export interface Driver {
 }
 
 export class DeviceManager{
-    devices: Record<string, IDevice> = {};
+    private devices = new Map<string, IDevice>();
     private system: System;
     private matchTable = new Map<string, (x:IDeviceDescription) => void>();
     private deviceDrivers: Driver[] = [];
@@ -30,11 +30,11 @@ export class DeviceManager{
 
 
     registerDevice(device: IDevice){
-        this.devices[device.id] = device;
+        this.devices.set(device.id, device);
     }
 
-    getDevice(id: string): IDevice{
-        return this.devices[id];
+    getDevice(id: string): IDevice|undefined{
+        return this.devices.get(id);
     }
 
     registerDriver(driver: Driver){

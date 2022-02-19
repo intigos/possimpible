@@ -1,8 +1,9 @@
 import {ISystemModule} from "../modules";
 import {System} from "../system";
 import {IChannel} from "../vfs/channel";
-import {Perm, IStat, PError, Status, Type} from "../../public/api";
+import {IStat, Perm, PError, Status, Type} from "../../public/api";
 import {Task} from "../proc/task";
+import {packA, packStat} from "../../shared/struct";
 
 interface Srv {
     name: string,
@@ -36,7 +37,24 @@ function init(system: System){
 
     async function srvread(c: IChannel, count: number, offset: number): Promise<Uint8Array>{
         if(c.type & Type.DIR){
-            return te.encode(root.map(x => x.name).reduce((x,y) => x + "\n" + y) || "");
+            let s: IStat[] = [];
+            for (const srv of root) {
+                s.push({
+                    atime: system.boottime,
+                    gid: system.sysUser,
+                    length: 0,
+                    mode: 0o644,
+                    mtime: system.boottime,
+                    muid: system.sysUser,
+                    name: srv.name,
+                    srv: "s",
+                    subsrv: 0,
+                    type: Type.FILE,
+                    uid: system.sysUser
+                });
+            }
+
+            return packA(s, packStat);
         }
         throw new PError(Status.EPERM);
     }

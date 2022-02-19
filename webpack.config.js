@@ -9,7 +9,117 @@ const TerserPlugin = require('terser-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const RemoveEmptyScriptsPlugin = require('webpack-remove-empty-scripts');
 
-module.exports = (env = {}) => ({
+// load toolchain files
+const fs = require('fs');
+const {spawn} = require("child_process");
+let rawdata = fs.readFileSync('config/toolchain.json');
+let toolchainConfig = JSON.parse(rawdata);
+
+const entrypoints = {}
+toolchainConfig.execs.forEach(x => {
+    entrypoints[x] = [path.resolve(__dirname, `./src/toolchain/${x}/src/main.ts`)]
+})
+
+const bootConfig = (env = {}) => ({
+    mode: env.prod ? 'production' : 'development',
+    devtool: env.prod ? 'source-map' : 'eval-cheap-module-source-map',
+    entry: entrypoints,
+    output: {
+        path: path.resolve(__dirname, './dist/bin/'),
+        filename: 'js/[name].js',
+        publicPath: '/',
+        chunkFilename: 'js/[name].js'
+    },
+    stats: 'summary',
+    plugins: [
+        new webpack.DefinePlugin({
+        }),
+        new CaseSensitivePathsPlugin(),
+        new RemoveEmptyScriptsPlugin(),
+    ],
+    module: {
+        rules: [
+            {
+                test: /\.tsx?$/,
+                loader: 'ts-loader',
+                options: {
+                    transpileOnly: true,
+                    happyPackMode: false,
+
+                    configFile: "src/toolchain/tsconfig.json"
+                }
+            },
+        ],
+    },
+    stats: {
+        colors: true,
+        modules: true,
+        reasons: true,
+        errorDetails: true
+    },
+    optimization: {
+        splitChunks: {
+            cacheGroups: {
+                vendors: {
+                    name: 'chunk-vendors',
+                    test: /[\\/]node_modules[\\/]/,
+                    priority: -10,
+                    chunks: 'initial'
+                },
+                common: {
+                    name: 'chunk-common',
+                    minChunks: 2,
+                    priority: -20,
+                    chunks: 'initial',
+                    reuseExistingChunk: true
+                }
+            }
+        },
+        minimizer: [
+            new CssMinimizerPlugin(),
+            new TerserPlugin({
+                extractComments: false,
+                terserOptions: {
+                    output: {
+                        comments: false,
+                    },
+                },
+            }),
+        ],
+    },
+    stats: 'errors-only',
+
+
+    plugins: [
+        {
+            apply: (compiler) => {
+                compiler.hooks.afterEmit.tap('AfterEmitPlugin', (compilation) => {
+                    const child = spawn('ts-node', ["-T", "utils/linking.ts"]);
+                    child.stdout.on('data', function (data) {
+                        process.stdout.write(data);
+                    });
+                    child.stderr.on('data', function (data) {
+                        process.stderr.write(data);
+                    });
+
+                });
+            }
+        }
+    ],
+
+    resolve: {
+        extensions: ['.ts', '.js', '.vue', '.json'],
+        alias: {
+            '@': path.resolve(__dirname, '/src'),
+            '#': path.resolve(__dirname, '/src/libs/include'),
+        },
+    },
+    experiments: {
+        topLevelAwait: true,
+    },
+});
+
+const coreConfig = (env = {}) => ({
     mode: env.prod ? 'production' : 'development',
     devtool: env.prod ? 'source-map' : 'eval-cheap-module-source-map',
     entry: {
@@ -125,23 +235,7 @@ module.exports = (env = {}) => ({
         errorDetails: true
     },
     optimization: {
-        splitChunks: {
-            cacheGroups: {
-                vendors: {
-                    name: 'chunk-vendors',
-                    test: /[\\/]node_modules[\\/]/,
-                    priority: -10,
-                    chunks: 'initial'
-                },
-                common: {
-                    name: 'chunk-common',
-                    minChunks: 2,
-                    priority: -20,
-                    chunks: 'initial',
-                    reuseExistingChunk: true
-                }
-            }
-        },
+        runtimeChunk: true,
         minimizer: [
             new CssMinimizerPlugin(),
             new TerserPlugin({
@@ -177,3 +271,7 @@ module.exports = (env = {}) => ({
         ]
     },
 });
+
+const configuration = [bootConfig, coreConfig];
+configuration.watch = true;
+module.exports = configuration

@@ -211,7 +211,7 @@ export class NameI{
                 nd.path.mount == nd.root.mount){
                 break;
             }
-            if(nd.path.channel != nd.path.mount?.root){
+            if(nd.path.channel != nd.path.mount?.root.channel){
                 nd.path.channel = nd.path.channel.parent!;
                 break;
             }
@@ -241,9 +241,14 @@ export class NameI{
 
     async do_lookup(nd: nameidata, component: string) {
         if(component[0] == "#"){
-            nd.path.channel = await this.system.dev.getDevice(component.substring(1)).operations.attach!("", this.system);
-            nd.path.mount = null;
-            return;
+            const dev = this.system.dev.getDevice(component.substring(1));
+            if(dev){
+                if(dev.operations.attach){
+                    nd.path.channel = await dev.operations.attach!("", this.system);
+                    nd.path.mount = null;
+                    return;
+                }else throw new PError(Status.EPERM);
+            }else throw new PError(Status.ENODEV);
         }
 
         let c = channel_get_cache(nd.path.channel, component);
@@ -255,11 +260,11 @@ export class NameI{
                     c = null;
                     for(const mount of channelmounts(m?.channel!, nd.ns)){
                         try{
-                            let ch = channel_get_cache(mount.root, component);
+                            let ch = channel_get_cache(mount.root.channel, component);
                             if(!ch){
-                                ch = this.system.channels.clone(mount.root!);
-                                await mount.root!.operations.walk?.(mount.root, ch, component)
-                                channel_set_cache(mount.root!, ch);
+                                ch = this.system.channels.clone(mount.root.channel!);
+                                await mount.root.channel!.operations.walk?.(mount.root.channel, ch, component)
+                                channel_set_cache(mount.root.channel!, ch);
                             }
                             c = ch;
                             break;

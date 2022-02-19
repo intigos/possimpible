@@ -9,16 +9,12 @@
     "compileworker": "tsc --project tsconfig.worker.json",
     "docs": "mkdir -p docs/js && cp -r dist/favicon.png dist/fonts dist/fonts.css dist/index.html docs/ && cp -r dist/js/vm.js dist/js/chunk-vendors.js docs/js",
     "buildworker": "yarn run compileworker && yarn run linkworker && rm -R dist/worker/",
-    "compileexecs": "./node_modules/webpack/bin/webpack.js --config webpack.toolchain.js",
-    "buildtoolchain": "yarn compiletoolchain && yarn run buildinitrd",
-    "compiletoolchain": "yarn compilelibraries && yarn compileexecs",
-    "buildinitrd": "mkdir -p dist/bin && ts-node -T utils/buildimg.ts",
-    "compilelibraries": "./node_modules/webpack/bin/webpack.js --config webpack.libraries.js",
-    "build": "yarn run buildworker && yarn run buildtoolchain && yarn run buildboot"
+    "build": "yarn run buildworker && yarn run buildboot"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "snabbdom": "^3.3.1",
     "@types/xterm": "^3.0.0",
     "event-iterator": "^2.0.0",
     "local-echo": "git://github.com/wavesoft/local-echo.git",
@@ -32,6 +28,7 @@
   "devDependencies": {
     "@types/argparse": "^2.0.10",
     "@types/node": "^17.0.4",
+    "snabbdom-typestyle": "^1.0.9",
     "@types/ua-parser-js": "^0.7.36",
     "argparse": "^2.0.1",
     "browserify": "^17.0.0",

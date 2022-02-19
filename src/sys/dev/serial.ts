@@ -9,14 +9,30 @@ function init(system: System){
         probe: async (x, match) => {
             const rootdir: IDirtab[] = [
                 {
-                    name: "serial", id:1, type:Type.FILE, l:0, mode: 0, uid: system.sysUser,
-                    write: async (file, buf, offset) => {
-                        return (x as any).properties.write(buf);
-                    },
-                    read: async (c: IChannel, count: number, offset: number) => {
-                        const buf = await (x as any).properties.read();
-                        return new TextEncoder().encode(buf);
-                    },
+                    name: "serial", id:1, type:Type.DIR, l:0, mode: 0, uid: system.sysUser, dirtab: [
+                        {name: "data", id:1, type:Type.FILE, l:0, mode: 0, uid: system.sysUser,
+                            write: async (file, buf, offset) => {
+                                return (x as any).properties.write(buf);
+                            },
+                            read: async (c: IChannel, count: number, offset: number) => {
+                                const buf = await (x as any).properties.read();
+                                return new TextEncoder().encode(buf);
+                            }
+                        },
+                        {name: "ctrl", id:1, type:Type.FILE, l:0, mode: 0, uid: system.sysUser,
+                            write: async (file, buf, offset) => {
+                                switch (new TextDecoder().decode(buf)){
+                                    case "hide":
+                                        (x as any).properties.visibility(false);
+                                        break;
+                                    case "show":
+                                        (x as any).properties.visibility(true);
+                                        break;
+                                }
+                            }
+                        },
+                    ]
+
                 }
             ]
 

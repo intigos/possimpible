@@ -4,6 +4,8 @@ import {ISystemModule} from "../modules";
 import bootbin from "&/bin/boot.img";
 // @ts-ignore
 import memfs from "&/bin/memfs.img";
+// @ts-ignore
+import pclient from "&/bin/11pclient.img";
 import {create, getstat, IDirtab, mkdirtabA, read, walk} from "../dirtab";
 import {Type} from "../../public/api";
 
@@ -17,6 +19,10 @@ async function init(system: System) {
             read: async (c, count, offset) => {
                 return new Uint8Array(await (await (await fetch(memfs)).blob()).arrayBuffer());
             }},
+        {name: "11pclient", id:1, type:Type.FILE, l:0, mode: 0, uid: system.sysUser,
+            read: async (c, count, offset) => {
+                return new Uint8Array(await (await (await fetch(pclient)).blob()).arrayBuffer());
+            }},
     ];
 
     const rootdir: IDirtab[] = [
@@ -28,6 +34,7 @@ async function init(system: System) {
         {name: "proc", id:1, type:Type.DIR, l:0, mode:0, create: create},
         {name: "root", id:1, type:Type.DIR, l:0, mode:0, create: create},
         {name: "srv", id:1, type:Type.DIR, l:0, mode:0, create: create},
+        {name: "sys", id:1, type:Type.DIR, l:0, mode:0, create: create},
         {name: "boot", id:1, type:Type.DIR, l:0, mode:0, create: create, dirtab: bootdir},
     ]
 
@@ -60,7 +67,7 @@ function cleanup(){
 }
 
 const module: ISystemModule = {
-    name: "rootfs",
+    name: "root",
     init: init,
     cleanup: cleanup
 }

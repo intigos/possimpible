@@ -70,26 +70,38 @@ export class Process{
     }
 
     private async handleMessage(handle: MessageEvent<Uint8Array>) {
-        let message = handle.data;
-        const [type, id] = peak(message);
-        if (type >= MessageType.READ_RES) {
-            if (this.router.has(id)) {
-                this.router.get(id)!.call(null, message);
-                this.router.delete(id);
+        try {
+            let message = handle.data;
+            const [type, id] = peak(message);
+            if (type >= MessageType.READ_RES) {
+                if (this.router.has(id)) {
+                    this.router.get(id)!.call(null, message);
+                    this.router.delete(id);
+                }
+            } else if (type == MessageType.DEPENDENCY) {
+                let [_, name, code] = MUDependency(message);
+                (self as any)[name] = null;
+                eval(code);
+            } else if (type == MessageType.START) {
+                let [_, code, argv] = MUStart(message)
+                this.argv = argv;
+                eval(code);
+                const cs = this.callsites.get("__start");
+                if (cs) {
+                    try {
+                        await cs(argv);
+                    } catch (e) {
+                        console.error("Inside Worker", e);
+                    } finally {
+                        await this.sys_die(0);
+                    }
+
+
+                }
             }
-        } else if (type == MessageType.DEPENDENCY) {
-            let [_, name, code] = MUDependency(message);
-            (self as any)[name] = null;
-            eval(code);
-        } else if (type == MessageType.START) {
-            let [_, code, argv] = MUStart(message)
-            this.argv = argv;
-            eval(code);
-            const cs = this.callsites.get("__start");
-            if (cs) {
-                await cs(argv);
-                await this.sys_die(0);
-            }
+        }catch(e){
+            console.error("Inside Worker", e);
+            await this.sys_die(0);
         }
     }
 

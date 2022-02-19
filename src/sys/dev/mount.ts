@@ -26,7 +26,7 @@ interface MountRPCNode{
 class MountClient{
     private tag: number;
     private fid: number;
-    private srv: IChannel;
+    srv: IChannel;
     private aname: string;
 
     constructor(fd, aname) {
@@ -175,7 +175,7 @@ function cleanup(){
 }
 
 const module: ISystemModule = {
-    name: "rootfs",
+    name: "mount",
     init: init,
     cleanup: cleanup
 };

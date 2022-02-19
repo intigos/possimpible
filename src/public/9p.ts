@@ -1,5 +1,5 @@
-import {Perm, IStat, OMode, Type} from "./api";
-import {FileDescriptor} from "../shared/proc";
+import {Perm, IStat, OMode, Type, FileDescriptor} from "./api";
+
 import {
     pack, packA, packBytearray, packDouble, packStat,
     packString,

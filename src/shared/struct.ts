@@ -24,12 +24,12 @@ export function unpackBytearray(s:Uint8Array, p: number): Unpacked<Uint8Array>{
 }
 
 export function packString(s:string): Uint8Array{
-    const arr = encoder.encode(s)
+    const arr = encoder.encode(s);
     const buff = new ArrayBuffer(arr.length + 8)
-    const dv = new DataView(buff)
+    const dv = new DataView(buff);
     dv.setFloat64(0, arr.length);
     const result = new Uint8Array(buff);
-    result.set(arr, 8)
+    result.set(arr, 8);
     return result;
 }
 

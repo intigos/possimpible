@@ -16,6 +16,8 @@ async function main (args: string[]){
     await syscall.bind("#b", "/dev");
     await syscall.bind("#s", "/srv");
     await syscall.bind("#e", "/env");
+    await syscall.bind("#p", "/proc");
+    await syscall.bind("#y", "/sys");
     await syscall.bind("#⌨️", "/dev");
     await syscall.bind("#🐛️", "/dev");
 
@@ -33,19 +35,20 @@ async function main (args: string[]){
     for(const x of options.keys()){
         syscall.write(0, te.encode(x + "=" + options.get(x) + " "));
     }
-    syscall.write(0, te.encode("\n\r"));
+    syscall.write(0, te.encode("\n\r\n\r"));
 
-
-    await syscall.write(0, te.encode("Starting " + options.get("filesrv") + " of " + options.get("initrd") + "\n\r"));
-    await syscall.fork("/boot/" + options.get("filesrv"), [options.get("initrd")!, "/srv/initrd"], 0);
+    const mp = options.get("mountpoint")!;
+    const remote = options.get("remote")!;
+    const filesrv = options.get("filesrv")!;
+    await syscall.write(0, te.encode(`Starting ${filesrv} with ${mp}\n\r`));
+    await syscall.fork(`/boot/${filesrv}`, [remote, `/srv/${mp}`], 0);
 
     await syscall.sleep(1000);
 
-    await syscall.write(0, te.encode("Mounting /srv/initrd into /mnt/initrd\n\r"));
-    const fd = await syscall.open("/srv/initrd", OMode.RDWR)
-    await syscall.mount(fd, null, "/mnt/initrd", MType.CREATE);
-    await syscall.bind("/mnt/initrd/bin", "/bin", MType.CREATE);
-    await syscall.bind("/mnt/initrd/lib", "/lib", MType.CREATE);
+    await syscall.write(0, te.encode(`Mounting /srv/${mp} into /mnt/${mp}\n\r`));
+    const fd = await syscall.open(`/srv/${mp}`, OMode.RDWR)
+    await syscall.mount(fd, null, `/mnt/${mp}`, MType.CREATE, options.get("share"));
+    await syscall.bind(`/mnt/${mp}/bin`, `/bin`, MType.CREATE);
     let pid = await syscall.exec(options.get("initrc")!, []);
     await syscall.wait(pid);
 }

@@ -135,7 +135,7 @@ export const MUForkStart = (a: Uint8Array) =>
 export const MPFork = (id: MessageID, path:string, args: string[], mode: ForkMode2) =>
     pack([packInt8(MessageType.FORK), packString(id), packString(path), packA(args, packString), packDouble(mode)])
 export const MUFork = (a: Uint8Array) =>
-    unpackMessage(a, [unpackInt8, unpackString, unpackString, unpackA(unpackString), unpackDouble]) as [MessageID, string, string[]]
+    unpackMessage(a, [unpackInt8, unpackString, unpackString, unpackA(unpackString), unpackDouble]) as [MessageID, string, string[], ForkMode2]
 
 export const MPForkRes = (id: MessageID, pid: number) =>
     pack([packInt8(MessageType.FORK_RES), packString(id), packUInt32(pid)])
@@ -144,7 +144,7 @@ export const MUForkRes = (a: Uint8Array) =>
 
 
 export const MPWait = (id: MessageID, pid:number) =>
-    pack([packInt8(MessageType.FORK), packString(id), packUInt32(pid)])
+    pack([packInt8(MessageType.WAIT), packString(id), packUInt32(pid)])
 export const MUWait = (a: Uint8Array) =>
     unpackMessage(a, [unpackInt8, unpackString, unpackUInt32]) as [MessageID, number]
 

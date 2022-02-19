@@ -33,7 +33,7 @@ function cleanup(){
 }
 
 const module: ISystemModule = {
-    name: "cons",
+    name: "kbd",
     init: init,
     cleanup: cleanup
 }

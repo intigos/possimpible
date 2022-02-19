@@ -20,14 +20,16 @@ export class VirtualFileSystem{
         this.namei = new NameI(this.system);
     }
 
-    async attach(id: string, options: string): Promise<IChannel> {
-        if (this.system.dev.getDevice(id).operations.attach){
-            return await this.system.dev.getDevice(id).operations.attach!(options, this.system)
-        }
-        throw new PError(Status.EPERM);
+    async attach(id: string, options: string): Promise<IPath> {
+        const dev = this.system.dev.getDevice(id);
+        if(dev){
+            if (dev.operations.attach){
+                return { channel: await dev.operations.attach!(options, this.system), mount: null }
+            }else throw new PError(Status.EPERM);
+        }else throw new PError(Status.ENODEV);
     }
 
-    async cmount(newc: IChannel, oldc: IChannel, flags: number, parent: IMount|null, ns: IMountNS): Promise<IMount>{
+    async cmount(newc: IPath, oldc: IChannel, bind: boolean, flags: number, parent: IMount|null, ns: IMountNS): Promise<IMount>{
         if(!oldc.parent && parent){
             // might be a root of a mounted point
             let p = this.system.vfs.mounts.lookupMountpoint(parent);
@@ -35,17 +37,17 @@ export class VirtualFileSystem{
             parent = p?.mount!
         }
 
-        let vfsmnt = this.mounts.create(oldc, newc, parent, flags, ns);
+        let vfsmnt = this.mounts.create(oldc, newc, parent, bind, flags, ns);
 
         return vfsmnt;
     }
 
     async unmount(mount:IMount, ns: IMountNS, oldc?: IChannel): Promise<void>{
         if(oldc){
-            this.mounts.delete(oldc, mount.root, ns)
+            this.mounts.delete(oldc, mount.root.channel, ns)
         }else{
-            for (const m of channelmounts(mount.root, ns)){
-                this.mounts.delete(mount.mountpoint, mount.root, ns)
+            for (const m of channelmounts(mount.root.channel, ns)){
+                this.mounts.delete(mount.mountpoint, mount.root.channel, ns)
             }
         }
         return;
@@ -57,14 +59,16 @@ export class VirtualFileSystem{
     }
 
     async open(path: IPath, mode: OMode): Promise<IFile>{
+        let c = path.channel
         if(path.channel){
             if(path.channel.operations.open) {
-                path.channel = await path.channel.operations.open(path.channel, mode)
+                c = await path.channel.operations.open(path.channel, mode)
             }
 
             return {
                 position: 0,
-                channel: path.channel
+                channel: c,
+                path: path
             };
         }
 
@@ -82,7 +86,10 @@ export class VirtualFileSystem{
                 entry = entry.parent;
             }
             if(entry != task.root.channel){
-                p = this.system.vfs.mounts.lookupMountpoint(mount!);
+                p = this.system.vfs.mounts.lookupMountpoint(mount!)!;
+                if(p?.channel.parent){
+                    p.channel = p?.channel.parent;
+                }
             }else{
                 return buf.length ? buf : "/";
             }
@@ -113,7 +120,8 @@ export class VirtualFileSystem{
                 channel_set_cache(path.channel, c);
                 return {
                     position: 0,
-                    channel: c
+                    channel: c,
+                    path: path
                 };
             }else throw new PError(Status.EPERM);
         } else throw new PError(Status.ENOENT);
@@ -121,18 +129,18 @@ export class VirtualFileSystem{
 
     async close(f: IFile) {
         if(f.channel.operations.close){
-            await f.channel.operations.close(f.channel);
+            await f.channel.operations.close(f.path.channel);
         }
     }
 
 
     async dirread(channel: IChannel, task: IProtoTask): Promise<IStat[]> {
         let a: IStat[] = [];
-        let m = task.ns.mnt.mounts.find(x => x.mount.root == channel);
+        let m = task.ns.mnt.mounts.find(x => x.mount.root.channel == channel);
         if (m) {
             for (const mount of channelmounts(m.mount.mountpoint, task.ns.mnt)) {
-                if(mount.root.operations.read){
-                    const buf = await mount.root.operations.read!(mount.root, -1, 0);
+                if(mount.root.channel.operations.read){
+                    const buf = await mount.root.channel.operations.read!(mount.root.channel, -1, 0);
                     a.push(...unpackA(unpackStat)(buf, 0)[0])
                 }else{
                     throw new PError(Status.EPERM);

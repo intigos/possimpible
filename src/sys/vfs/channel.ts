@@ -78,6 +78,16 @@ export function channel_set_cache(parent: IChannel, c: IChannel){
     parent.children.push(c);
 }
 
+export function channeldevpath(c: IChannel){
+    let result = "";
+    let p: IChannel|null = c;
+    while(p?.parent) {
+        result = "/" + p.name + result;
+        p = p.parent;
+    }
+    return "#" + c.srv + result;
+}
+
 export function* channelmounts(c: IChannel, ns: IMountNS): Generator<IMount>{
     for (const mount of ns.mounts) {
         if(mount.mount.mountpoint == c){

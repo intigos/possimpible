@@ -5,24 +5,25 @@ import {ProcessManager} from "./proc/proc";
 import {ModularityManager} from "./modules";
 import {NamespaceManager} from "./ns/ns";
 import {ChannelManager} from "./vfs/channel";
+import {ForkMode2} from "../public/api";
+import {IFile, IProtoTask} from "./proc/task";
+import {LogManager} from "./log";
+import {red} from "./colors";
 
 import root from "./dev/root";
 import cons from "./dev/cons";
 import kbd from "./dev/kbd";
 import serial from "./dev/serial";
-import {LogManager} from "./log";
-import {red} from "./colors";
 import srv from "./dev/srv";
 import bootimg from "./dev/bootimg";
 import pipe from "./dev/pipe";
 import mount from "./dev/mount";
-import {IFile, IProtoTask} from "./proc/task";
 import cpu from "./dev/cpu";
-import {ForkMode2} from "../public/api";
 import env from "./dev/env";
 import console from "./dev/console";
 import websockets from "./dev/websockets";
-
+import proc from "./dev/proc";
+import sys from "./dev/sys";
 
 export type ISystemOptions = Record<string, string>;
 
@@ -32,7 +33,7 @@ export type ISystemOptions = Record<string, string>;
  */
 export class System{
     public vfs: VirtualFileSystem;
-    private options: Partial<ISystemOptions>;
+    public options: Partial<ISystemOptions>;
     public descriptions?: IDeviceDescription[];
 
     public dev: DeviceManager;
@@ -67,29 +68,34 @@ export class System{
         const ns = this.ns.create(null, 0);
 
         const root = await this.vfs.attach("/", "");
-        let mount = await this.vfs.cmount(root, this.channels.mkchannel(), 0, null, ns.mnt);
+        let mount = await this.vfs.cmount(root, root.channel, true, 0, null, ns.mnt);
 
         this.ktask = {
             gid: this.sysUser, uid: this.sysUser,
             pid: 0,
-            root: {channel: root, mount: mount},
-            pwd: {channel: root, mount: mount},
+            root: {channel: root.channel, mount: mount},
+            pwd: {channel: root.channel, mount: mount},
             ns: ns,
             files: {fileDescriptors: []},
-            env: new Map<string, string>()
+            env: new Map<string, string>(),
+            user: this.sysUser
         };
 
         const cpu = await this.vfs.attach("C", "");
         this.ktask.env.set("CPUPATH", "/dev/cpu");
+        this.ktask.env.set("PATH", "/bin");
         const dev = await this.vfs.lookup("/dev", this.ktask);
-        await this.vfs.cmount(cpu, dev.channel, 0, dev.mount, ns.mnt);
+        await this.vfs.cmount(cpu, dev.channel, true, 0, dev.mount, ns.mnt);
 
         this.current = this.ktask;
     }
 
     async boot(devices:IDeviceDescription[]){
+        this.descriptions = devices;
         await this.mod.installModule(root);
         await this.mod.installModule(cons);
+        await this.mod.installModule(proc);
+        await this.mod.installModule(sys);
         await this.mod.installModule(kbd);
         await this.mod.installModule(srv);
         await this.mod.installModule(serial);
@@ -100,7 +106,6 @@ export class System{
         await this.mod.installModule(env);
         await this.mod.installModule(console);
         await this.mod.installModule(websockets);
-        this.descriptions = devices;
         await this.dev.init()
         await this.setupSystemTask();
         const args = Object.keys(this.options).map(x => {
@@ -114,9 +119,5 @@ export class System{
 
     printk(data: string){
         this.console?.channel.operations.write!(this.console?.channel, this.encoder.encode(data.replace("\n", "\n\r")), -1);
-    }
-
-    panic(data: string){
-        this.printk( red("PANIC") + " : " + data);
     }
 }

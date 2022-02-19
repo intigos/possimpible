@@ -21,7 +21,7 @@ import {
     MPRemoveRes,
     MPSignal, MPSleep, MPSleepRes,
     MPStart,
-    MPStatRes,
+    MPStatRes, MPWaitRes,
     MPWriteRes,
     MUBind,
     MUChCwd,
@@ -64,7 +64,7 @@ export class ProcessManager {
                     let [id, fd, buf] = MUWrite(message);
                     const file = task.files.fileDescriptors[fd];
                     if (file) {
-                        const channel = file.channel;
+                        const channel = file.channel
                         if (channel.operations.write) {
                             await channel.operations.write(channel, buf, file.position);
                             await task.send(MPWriteRes(id, 0))
@@ -154,25 +154,36 @@ export class ProcessManager {
                 case MessageType.BIND: {
                     let [id, name, old, flags] = MUBind(message);
 
-                    let dev: IChannel;
+                    let dev: IPath;
+                    let devType = false;
                     if (name[0] == "#"){
-                        dev = await this.system.dev.getDevice(name.substring(1)).operations.attach!("", this.system)
+                        const d = this.system.dev.getDevice(name.substring(1));
+                        if(d){
+                            if(d.operations.attach){
+                                dev = {
+                                    channel: await d.operations.attach("", this.system),
+                                    mount: null
+                                }
+                                devType = true;
+                            }else throw new PError(Status.EPERM);
+                        }else throw new PError(Status.ENODEV)
+
                     }else{
-                        const path = await this.system.vfs.lookup(name, task);
-                        dev = path.channel;
+                        dev = await this.system.vfs.lookup(name, task);
                     }
 
                     let mp:IPath;
+
                     if(flags & MType.CREATE){
                         const nd = await this.system.vfs.namei.pathLookup(old, Lookup.PARENT, task);
-                        const perm = Perm.MOUNT | ((dev.type == Type.DIR) ? Perm.DIR : 0);
+                        const perm = Perm.MOUNT | ((dev.channel.type == Type.DIR) ? Perm.DIR : 0);
                         const file = await this.system.vfs.create(nd.path, nd.last, 0, perm);
                         mp = {channel: file.channel, mount: nd.path.mount}
                     }else{
                         mp = await this.system.vfs.lookup(old, task)!;
                     }
 
-                    await this.system.vfs.cmount(dev, mp.channel, flags, mp.mount, this.system.current.ns.mnt)
+                    await this.system.vfs.cmount(dev, mp.channel, true, flags, mp.mount, this.system.current.ns.mnt)
                     await task.send(MPBindRes(id))
                     break;
                 }
@@ -181,23 +192,26 @@ export class ProcessManager {
                     let [id, fd, afd, old, aname, flags] = MUMount(message)
                     const file = task.files.fileDescriptors[fd];
                     const afile = task.files.fileDescriptors[afd];
-                    const dev = await this.system.dev.getDevice("M").operations.attach!({
-                        fd: file?.channel,
-                        afd: afile?.channel,
-                        aname: aname
-                    }, this.system)
+                    const dev = {
+                        channel: await this.system.dev.getDevice("M")!.operations.attach!({
+                            fd: file?.channel,
+                            afd: afile?.channel,
+                            aname: aname
+                        }, this.system),
+                        mount: null
+                    }
 
                     let mp: IPath;
                     if(flags & MType.CREATE){
                         const nd = await this.system.vfs.namei.pathLookup(old, Lookup.PARENT, task);
-                        const perm = Perm.MOUNT | ((dev.type == Type.DIR) ? Perm.DIR : 0);
+                        const perm = Perm.MOUNT | ((dev.channel.type == Type.DIR) ? Perm.DIR : 0);
                         const file = await this.system.vfs.create(nd.path, nd.last, 0, perm);
                         mp = {channel: file.channel, mount: nd.path.mount}
                     }else{
                         mp = await this.system.vfs.lookup(old, task)!;
                     }
 
-                    await this.system.vfs.cmount(dev, mp.channel, flags, mp.mount, this.system.current.ns.mnt)
+                    await this.system.vfs.cmount(dev, mp.channel, false, flags, mp.mount, this.system.current.ns.mnt)
                     await task.send(MPMountRes(id))
                     break;
                 }
@@ -223,8 +237,8 @@ export class ProcessManager {
                 }
 
                 case MessageType.FORK: {
-                    const [id, entrypoint, args] = MUFork(message);
-                    const t = await this.fork(entrypoint, args, 0, task);
+                    const [id, entrypoint, args, mode] = MUFork(message);
+                    const t = await this.fork(entrypoint, args, mode, task);
                     await task.send(MPForkRes(id, t.pid))
                     break;
                 }
@@ -262,6 +276,7 @@ export class ProcessManager {
                     const atask = task.ns.pid.get(pid);
                     if(atask){
                         await this.wait(pid, atask);
+                        await task.send(MPWaitRes(id))
                     }else throw new PError(Status.EINVAL);
                 }
 
@@ -275,7 +290,7 @@ export class ProcessManager {
                 case MessageType.PIPE: {
                     let [id] = MUPipe(message);
 
-                    const dev = await this.system.dev.getDevice("|").operations.attach?.("", this.system)
+                    const dev = await this.system.dev.getDevice("|")!.operations.attach?.("", this.system)
                     const data = await this.system.vfs.lookup("/data", task, dev);
                     const data1 = await this.system.vfs.lookup("/data1", task, dev);
                     const file = await this.system.vfs.open(data, OMode.READ);
@@ -316,6 +331,7 @@ export class ProcessManager {
         if (task.files.fileDescriptors[fd]){
             this.system.vfs.close(task.files.fileDescriptors[fd]!);
             task.files.fileDescriptors[fd] = null;
+            return;
         }
 
         throw new PError(Status.EBADFD);
@@ -351,7 +367,7 @@ export class ProcessManager {
         const id = await cpuctrl.channel.operations.read!(cpuctrl.channel, -1, 0);
         let container = await this.system.vfs.lookup(path + "/" + this.system.decoder.decode(id), parent)!;
         let cpu = await this.system.vfs.open(container, OMode.RDWR);
-        return cpu.channel;
+        return cpu;
     }
 
     private async fetchBin(channel: IChannel, parent: IProtoTask){
@@ -392,11 +408,12 @@ export class ProcessManager {
 
             let fds;
             if(fork & ForkMode2.COPY_FD){
+
                 fds = {fileDescriptors:Array.from(parent.files.fileDescriptors)}
             }else if(fork & ForkMode2.EMPTY_FD){
                 fds = {fileDescriptors: []};
             }else{
-                fds = {fileDescriptors: parent.files};
+                fds = {fileDescriptors: parent.files.fileDescriptors};
             }
 
             let env;
@@ -408,8 +425,8 @@ export class ProcessManager {
                 env = parent.env;
             }
 
-            const task = new Task(entry, args, this.system.sysUser, this.system.sysUser, parent.pwd, parent.root, ns, parent.pid, cpu, fds, env, this.handleProcess.bind(this));
-            await this.loadDependencies(bin, task, parent);
+            const task = new Task(entry, args, this.system.sysUser, this.system.sysUser, parent.pwd, parent.root, ns, parent.pid, cpu, fds, env, this.system.current!.user, this.handleProcess.bind(this));
+            //await this.loadDependencies(bin, task, parent);
             await task.send(MPStart("", bin.code, [path].concat(args)))
             setTimeout(async () => await task.run(), 0);
             return task;
@@ -426,7 +443,7 @@ export class ProcessManager {
             let entry = await this.system.vfs.lookup(path, task)!;
             let file = await this.system.vfs.open(entry, OMode.EXEC | OMode.READ);
             const bin = await this.fetchBin(file.channel, task);
-            await this.loadDependencies(bin, task, task);
+            //await this.loadDependencies(bin, task, task);
 
             await task.send(MPStart("", bin.code, [path].concat(argv)))
             setTimeout(async () => await task.run(), 0);

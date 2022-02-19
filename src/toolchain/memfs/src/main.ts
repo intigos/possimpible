@@ -1,7 +1,7 @@
 import {IStat, OMode, Perm, Type} from "../../../public/api";
 import {Fid, Service9P} from "../../../public/9p";
 import {IMemINode, IMemSuperNode, MemData_ptr, MemDirEnt_ptr, MemINodeType} from "../../../sys/memfs/low";
-import sys from "../../../sys/dev/sys";
+import {packA, packStat} from "../../../shared/struct";
 
 async function slurp(s: string){
     const fd = await self.proc.sys.open(s, OMode.READ);
@@ -55,19 +55,51 @@ try {
             const node = srv.get(fid) as IMemINode;
             let result;
             if(node.type == MemINodeType.DIRECTORY){
-                result = (node.map as MemDirEnt_ptr[]).map(x => sb.dirents[x]?.name || "").reduce((x, y) => x + "\n" + y);
+                const result: IStat[] = [];
+                for (const ent of (node.map as MemDirEnt_ptr[])) {
+                    const node = sb.nodes[ent];
+                    const stat: IStat = {
+                        atime: 1644184028,
+                        gid: "root",
+                        length: 0,
+                        mode: 644,
+                        mtime: 1644184028,
+                        muid: "root",
+                        name: sb.dirents[node?.pos!]?.name!,
+                        srv: "M",
+                        subsrv: 0,
+                        type: (typeof node?.map == 'number') ? Type.DIR : Type.FILE,
+                        uid: "root"
+                    }
+                    result.push(stat);
+                }
+                return Promise.resolve(packA(result, packStat))
             }else{
                 result = sb.data[node.map as MemData_ptr]!;
+                return Promise.resolve(new TextEncoder().encode(result));
             }
-            return Promise.resolve(new TextEncoder().encode(result));
         },
 
         remove(fid: Fid): Promise<void> {
             throw "NI";
         },
 
-        stat(fid: Fid): Promise<IStat> {
-            throw "NI";
+        async stat(fid: Fid): Promise<IStat> {
+            const node = srv.get(fid) as IMemINode;
+            const stat: IStat = {
+                atime: 1644184028,
+                gid: "root",
+                length: 0,
+                mode: 644,
+                mtime: 1644184028,
+                muid: "root",
+                name: sb.dirents[node?.pos!]?.name!,
+                srv: "M",
+                subsrv: 0,
+                type: (typeof node?.map == 'number') ? Type.FILE : Type.DIR,
+                uid: "root"
+            }
+            return stat;
         },
 
         walk(fid: Fid, newfid: Fid, name: string[]): Promise<Type[]> {
