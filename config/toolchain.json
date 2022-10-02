@@ -1,18 +1,8 @@
 {
   "libs": [
-    "libts"
   ],
   "execs": [
-    "cat",
-    "init",
-    "login",
-    "psh",
-    "mount",
-    "umount",
-    "mkdir",
-    "rmdir",
-    "boot",
-    "memfs"
+    "init"
   ],
   "exclude": [
     "boot",

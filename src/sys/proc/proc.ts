@@ -41,15 +41,18 @@ import {
 import {pid, PidManager} from "./pid";
 import {IFile, IProtoTask, Task} from "./task";
 import {packA, packStat} from "../../shared/struct";
+import {LinkerManager} from "./linker";
 
 
 export class ProcessManager {
     private system: System;
     public pids: PidManager;
+    private linker: LinkerManager;
 
     constructor(kernel: System) {
         this.system = kernel;
         this.pids = new PidManager(this.system);
+        this.linker = new LinkerManager(this.system);
     }
 
     async handleProcess(message: Uint8Array, task: Task) {
@@ -314,27 +317,6 @@ export class ProcessManager {
         return cpu.channel;
     }
 
-    private async fetchBin(channel: IChannel, parent: IProtoTask){
-        let content: string;
-        if(channel.operations.read){
-            content = this.system.decoder.decode(await channel.operations.read!(channel, -1, 0));
-        }else{
-            throw new PError(Status.EINVAL);
-        }
-
-        if (!content.startsWith("PEXF:")) {
-            throw new PError(Status.ENOEXEC);
-        }
-        let pexfstruct: IPEXF = JSON.parse(content.substring(5));
-        return pexfstruct;
-    }
-
-    private async loadDependencies(pexfstruct: IPEXF, task: Task, parent: IProtoTask){
-        for(const dep of await this.fetchDependencyChannel(pexfstruct.dependencies, parent)){
-            await task.send(MPDependency("", dep[0], dep[1].code));
-        }
-    }
-
     async fork(path: string, args: string[], fork:ForkMode2, parent: IProtoTask){
         const cpupath = parent.env.get("CPUPATH");
         if(cpupath){
@@ -346,9 +328,7 @@ export class ProcessManager {
                 ns = parent.ns;
             }
 
-            let entry = await this.system.vfs.lookup(path, parent)!;
-            let file = await this.system.vfs.open(entry, OpenMode.EXEC | OpenMode.READ);
-            const bin = await this.fetchBin(file.channel, parent);
+            const binary = await this.linker.link(path, parent);
 
             let fds;
             if(fork & ForkMode2.COPY_FD){
@@ -368,9 +348,8 @@ export class ProcessManager {
                 env = parent.env;
             }
 
-            const task = new Task(entry, args, this.system.sysUser, this.system.sysUser, parent.pwd, parent.root, ns, parent.pid, cpu, fds, env, this.handleProcess.bind(this));
-            await this.loadDependencies(bin, task, parent);
-            await task.send(MPStart("", bin.code, [path].concat(args)))
+            const task = new Task(args, this.system.sysUser, this.system.sysUser, parent.pwd, parent.root, ns, parent.pid, cpu, fds, env, this.handleProcess.bind(this));
+            await task.send(MPStart("", binary, [path].concat(args)))
             setTimeout(async () => await task.run(), 0);
             return task;
         }
@@ -383,22 +362,18 @@ export class ProcessManager {
             const cpu = await this.getCPUChannel(cpupath, task);
             await task.switchCPU(cpu);
 
-            let entry = await this.system.vfs.lookup(path, task)!;
-            let file = await this.system.vfs.open(entry, OpenMode.EXEC | OpenMode.READ);
-            const bin = await this.fetchBin(file.channel, task);
-            await this.loadDependencies(bin, task, task);
+            const binary = await this.linker.link(path, task);
 
-            await task.send(MPStart("", bin.code, [path].concat(argv)))
+            await task.send(MPStart("", binary, [path].concat(argv)))
             setTimeout(async () => await task.run(), 0);
-            task.path = entry;
             task.argv = argv;
             return task;
         }
         throw new PError(Status.ENOENT);
     }
 
-    wait(pid: pid, task: Task): Promise<string> {
-        return new Promise<string>((resolve, reject) => {
+    wait(pid: pid, task: Task): Promise<number> {
+        return new Promise<number>((resolve, reject) => {
             task.ns.pid.get(pid)!.waits.push(resolve);
         })
     }

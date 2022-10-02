@@ -106,6 +106,7 @@ export class System{
         const task = await this.proc.fork("/boot/boot", args, ForkMode2.NEW_NAMESPACE | ForkMode2.EMPTY_FD | ForkMode2.CLONE_MNT | ForkMode2.COPY_ENV, this.current!)
 
         await this.proc.wait(1, task);
+        console.log("System Shutdown");
     }
 
     printk(data: string){

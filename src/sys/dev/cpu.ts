@@ -8,6 +8,7 @@ import {debug, MessageType, peak} from "../../shared/proc";
 // @ts-ignore
 import workerImage from '&/worker.img';
 import {dequeue, enqueue, mkaqueue} from "../aqueue";
+import SharedBufferExchange from "../../proc/sbx";
 
 
 class Process implements IDirtab{
@@ -22,29 +23,36 @@ class Process implements IDirtab{
     mtime: number;
     muid: string;
     uid: string;
+    private buffer: SharedArrayBuffer;
+    private sbx: SharedBufferExchange;
 
     constructor(system: System) {
         this.muid = system.sysUser;
         this.uid = system.sysUser;
         this.atime = new Date().valueOf();
         this.mtime = this.atime;
+        this.buffer = new SharedArrayBuffer(1025);
         this.worker = new Worker(workerImage, {
             name: "" + this.name
         });
+        this.sbx = new SharedBufferExchange();
+        this.worker.postMessage(this.sbx.buffer);
 
-        this.worker.addEventListener("message", async (ev: MessageEvent<Uint8Array>) => {
-            console.log(this.name.substring(0,5) + " <", debug(ev.data));
-            await enqueue(this.aqueue, ev.data);
-        });
+    }
+
+    async init(){
+        await this.sbx.ready();
     }
 
     async read(c:IChannel, count:number, offset:number): Promise<Uint8Array> {
-        return await dequeue(c.map.aqueue);
+        const data = await (c.map as Process).sbx.read();
+        console.log(c.name.substring(0,5) + " <", debug(data));
+        return data;
     }
 
     async write(c:IChannel, buf:Uint8Array, offset: number) {
         console.log(c.name.substring(0,5) + " >", debug(buf));
-        c.map.worker.postMessage(buf);
+        await (c.map as Process).sbx.write(buf);
     }
 
     async remove(c: IChannel) {
@@ -57,6 +65,7 @@ async function init(system: System) {
         {name: "ctrl", id:1, type:Type.FILE, l:0, mode: 0, uid: system.sysUser,
             read: async (c, count, offset) => {
                 const process = new Process(system);
+                await process.init();
 
                 cpudir.push(mkdirtab(process, system));
 

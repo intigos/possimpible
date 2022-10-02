@@ -117,10 +117,10 @@ export const MPMount = (id: MessageID, fd: FileDescriptor, afd: FileDescriptor, 
 export const MUMount = (a: Uint8Array) =>
     unpackMessage(a, [unpackInt8, unpackString, unpackInt32, unpackInt32, unpackString, unpackString, unpackUInt32]) as [MessageID, FileDescriptor, FileDescriptor, string, string, MountType]
 
-export const MPStart = (id: MessageID, code: string, args: string[]) =>
-    pack([packInt8(MessageType.START), packString(id), packString(code), packA(args, packString)])
+export const MPStart = (id: MessageID, code: Uint8Array, args: string[]) =>
+    pack([packInt8(MessageType.START), packString(id), packBytearray(code), packA(args, packString)])
 export const MUStart = (a: Uint8Array) =>
-    unpackMessage(a, [unpackInt8, unpackString, unpackString, unpackA(unpackString)]) as [MessageID, string, string[]]
+    unpackMessage(a, [unpackInt8, unpackString, unpackBytearray, unpackA(unpackString)]) as [MessageID, Uint8Array, string[]]
 
 export const MPForkStart = (id: MessageID, code: string, entrypoint:string, args: string[]) =>
     pack([packInt8(MessageType.FORK_START), packString(id), packString(code), packString(entrypoint), packA(args, packString)])

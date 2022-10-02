@@ -40,7 +40,7 @@ export function mkdir(name: string, dirbn: IMemINode, sb: IMemSuperNode){
     return nbn;
 }
 
-export function mkfile(name: string, dirbn: IMemINode, content:string, sb: IMemSuperNode){
+export function mkfile(name: string, dirbn: IMemINode, content:Uint8Array, sb: IMemSuperNode){
     const nbn = mem_inode_alloc(
         MemINodeType.REGULAR,
         sb, dirbn.pos, mem_data_alloc(content, sb));
@@ -61,7 +61,7 @@ const te = new TextEncoder();
 export const read = async (c: IChannel, count: number, offset: number): Promise<Uint8Array> => {
     if(c.type & Type.DIR){
         const {sb, root} = c.map as {sb: IMemSuperNode, root: IMemINode};
-
+        console.log(sb.data[root.map as number]!);
         return te.encode(sb.data[root.map as number]!);
     }else{
         const {sb, root} = c.map as {sb: IMemSuperNode, root: IMemINode};

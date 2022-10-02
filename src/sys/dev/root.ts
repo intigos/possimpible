@@ -1,7 +1,7 @@
 import {System} from "../system";
 import {ISystemModule} from "../modules";
 // @ts-ignore
-import bootbin from "&/bin/boot.img";
+import bootbin from "&/bin/boot.wasm";
 // @ts-ignore
 import memfs from "&/bin/memfs.img";
 import {getstat, IDirtab, mkdirtabA, read, walk} from "../dirtab";

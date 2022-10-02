@@ -1,15 +1,9 @@
 import argp from "argparse";
 import fs from "fs";
 
-export function generatePEXF(name: string, bin:string, deps:string[]){
-    let content = fs.readFileSync(bin).toString()
-    let pexfstruct = {
-        name: bin,
-        dependencies: deps,
-        code: content
-    }
-
-    return "PEXF:" + JSON.stringify(pexfstruct);
+export function generatePEXF(name: string, bin:string, deps:string[]): Uint8Array{
+    let content = fs.readFileSync(bin);
+    return content
 }
 
 

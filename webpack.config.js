@@ -109,6 +109,10 @@ module.exports = (env = {}) => ({
                 type: 'asset/inline'
             },
             {
+                test: /dist\/[^.]+\.wasm$/,
+                type: "asset/inline",
+            },
+            {
                 test: /\.tsx?$/,
                 loader: 'ts-loader',
                 options: {
@@ -153,6 +157,10 @@ module.exports = (env = {}) => ({
                 },
             }),
         ],
+    },
+    experiments: {
+        asyncWebAssembly: true,
+        syncWebAssembly: true
     },
     devServer: {
         static: {

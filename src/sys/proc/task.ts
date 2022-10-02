@@ -2,6 +2,7 @@ import {IChannel} from "../vfs/channel";
 import {INSProxy} from "../ns/ns";
 import {IPath} from "../vfs/path";
 import {pid} from "./pid";
+import SharedBufferExchange from "../../proc/sbx";
 
 export enum ITaskStatus {
     PENDING,
@@ -44,8 +45,7 @@ export class Task implements IProtoTask {
     ns: INSProxy;
     pwd: IPath;
     root: IPath;
-    waits: ((value: (string | PromiseLike<string>)) => void)[];
-    path: IPath;
+    waits: ((value: (number | PromiseLike<number>)) => void)[];
     argv: string[];
     files: ITaskFiles;
     parent?: pid;
@@ -53,7 +53,7 @@ export class Task implements IProtoTask {
     handler: (arr: Uint8Array, task: Task) => void;
     env: Enviroment;
 
-     constructor(path: IPath, argv: string[], uid: string, gid: string, pwd: IPath,
+     constructor(argv: string[], uid: string, gid: string, pwd: IPath,
                  root: IPath, ns: INSProxy, parentPid: number, cpu: IChannel, files: ITaskFiles,
                  env: Enviroment, handler: (arr: Uint8Array, task: Task) => void) {
         this.sys = true;
@@ -63,7 +63,7 @@ export class Task implements IProtoTask {
         this.uid = uid;
         this.gid = gid;
         this.waits = [];
-        this.path = path;
+
         this.argv = argv;
         this.root = root;
         this.pwd = pwd;
@@ -110,5 +110,10 @@ export class Task implements IProtoTask {
         await this.cpu.operations.remove?.(this.cpu);
         this.status = ITaskStatus.STOP
         this.ns.pid.dettach(this);
+        setTimeout(() => {
+            this.waits.forEach(resolve => {
+                resolve(0);
+            })
+        }, 0)
     }
 }

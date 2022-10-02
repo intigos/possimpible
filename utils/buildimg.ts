@@ -53,16 +53,16 @@ for (let binname of toolchainConfig.execs){
     if(binname in toolchainConfig.exclude){
         continue;
     }
-    makeINode(mem_data_alloc(fs.readFileSync("dist/bin/" + binname + ".img", ).toString(), sb),
+    makeINode(mem_data_alloc(fs.readFileSync("dist/bin/" + binname), sb),
               binname, bin, MemINodeType.REGULAR, sb)
 }
-let lib = makeINode([], "lib", root, MemINodeType.DIRECTORY, sb)
-process.stdout.write("repack libs... \n");
-for (let libname of toolchainConfig.libs){
-    console.log(libname);
-    makeINode(mem_data_alloc(generateDynaLib(libname, `dist/libs/js/${libname}.js`, getDependencies(libname)), sb),
-              libname + ".dyna", lib, MemINodeType.REGULAR, sb)
-}
+// let lib = makeINode([], "lib", root, MemINodeType.DIRECTORY, sb)
+// process.stdout.write("repack libs... \n");
+// for (let libname of toolchainConfig.libs){
+//     console.log(libname);
+//     makeINode(mem_data_alloc(generateDynaLib(libname, `dist/libs/js/${libname}.js`, getDependencies(libname)), sb),
+//               libname + ".dyna", lib, MemINodeType.REGULAR, sb)
+// }
 process.stdout.write("building initrd... ");
 
 

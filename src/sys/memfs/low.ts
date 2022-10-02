@@ -1,3 +1,4 @@
+
 export interface IMemSuperNode{
     nodes: (IMemINode|null)[],
     dirents: (IMemDirEnt|null)[],
@@ -74,15 +75,15 @@ export function mem_remove_from_parent(parent: IMemINode, dirent: MemDirEnt_ptr,
 export function mem_inode_find_child(node: IMemINode, name: string, sb: IMemSuperNode): MemDirEnt_ptr|undefined{
     return (node.map as MemDirEnt_ptr[]).find(x => sb.dirents[x]!.name ==  name);
 }
-
-export function mem_data_alloc(content: string, sb: IMemSuperNode): MemData_ptr{
-    return sb.data.push(content) - 1;
+const d = new TextDecoder()
+export function mem_data_alloc(content: Uint8Array, sb: IMemSuperNode): MemData_ptr{
+    return sb.data.push(d.decode(content)) - 1;
 }
 
 export function mem_get_data(node: IMemINode, sb: IMemSuperNode){
     return sb.data[node.map as number];
 }
 
-export function mem_set_data(node: IMemINode, content: string, sb: IMemSuperNode): string{
-    return sb.data[node.map as number] = content;
+export function mem_set_data(node: IMemINode, content: Uint8Array, sb: IMemSuperNode): string{
+    return sb.data[node.map as number] = d.decode(content);
 }

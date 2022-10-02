@@ -1,4 +1,8 @@
-import {Process} from "./worker"
+import {Process} from "./process"
+let process;
 
-// @ts-ignore
-self.proc = new Process();
+self.addEventListener("message", (ev) => {
+    process = new Process(ev.data);
+    process.run();
+})
+
